@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/viper"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/homedir"
 )
 
@@ -43,7 +44,12 @@ func getKubernetesClient(contexts []string) (map[string]kubeClient, error) {
 	output := make(map[string]kubeClient)
 
 	for _, context := range contexts {
-		configOverrides := &clientcmd.ConfigOverrides{CurrentContext: context}
+		configOverrides := &clientcmd.ConfigOverrides{
+			CurrentContext: context,
+			Context: api.Context{
+				Namespace: viper.GetString("namespace"),
+			},
+		}
 		configRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: viper.GetString("kubeconfig")}
 
 		clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(configRules, configOverrides)
@@ -92,6 +98,11 @@ func init() {
 	}
 	if err := viper.BindEnv("context", "KUBECONTEXT"); err != nil {
 		outputErrAndExit("unable bind env `KUBECONTEXT`: %s", err)
+	}
+
+	flags.String("namespace", "", "Override kubernetes namespace in context")
+	if err := viper.BindPFlag("namespace", flags.Lookup("namespace")); err != nil {
+		outputErrAndExit("unable bind `namespace` flag: %s", err)
 	}
 
 	rootCmd.AddCommand(imageCmd)
