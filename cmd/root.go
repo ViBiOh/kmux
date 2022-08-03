@@ -80,11 +80,17 @@ func init() {
 	}
 
 	flags.String("kubeconfig", defaultConfig, "Kubernetes configuration file")
-	viper.BindPFlag("kubeconfig", flags.Lookup("kubeconfig"))
+	if err := viper.BindPFlag("kubeconfig", flags.Lookup("kubeconfig")); err != nil {
+		displayErrorAndExit("unable to bind `kubeconfig` flag: %s", err)
+	}
 
 	flags.String("context", "", "Kubernetes context, comma separated for mutiplexing commands")
-	viper.BindPFlag("context", flags.Lookup("context"))
-	viper.BindEnv("context", "KUBECONTEXT")
+	if err := viper.BindPFlag("context", flags.Lookup("context")); err != nil {
+		displayErrorAndExit("unable bind `context` flag: %s", err)
+	}
+	if err := viper.BindEnv("context", "KUBECONTEXT"); err != nil {
+		displayErrorAndExit("unable bind env `KUBECONTEXT`: %s", err)
+	}
 }
 
 func Execute() {
