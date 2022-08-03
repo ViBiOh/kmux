@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -13,17 +14,25 @@ var (
 	red  = color.New(color.FgRed).SprintFunc()
 )
 
-func displayOutput(prefix, format string, args ...any) {
+func outputContent(output io.Writer, prefix, format string, args ...any) {
 	if len(prefix) > 0 {
 		prefix = blue("[" + prefix + "] ")
 	}
 
 	for _, line := range strings.Split(fmt.Sprintf(format, args...), "\n") {
-		fmt.Fprint(os.Stdout, prefix, line, "\n")
+		fmt.Fprint(output, prefix, line, "\n")
 	}
 }
 
-func displayErrorAndExit(format string, args ...any) {
-	fmt.Fprint(os.Stderr, red(fmt.Sprintf(format+"\n", args...)))
+func outputStd(prefix, format string, args ...any) {
+	outputContent(os.Stdout, prefix, format, args...)
+}
+
+func outputErr(prefix, format string, args ...any) {
+	outputContent(os.Stderr, prefix, red(fmt.Sprintf(format, args...)))
+}
+
+func outputErrAndExit(format string, args ...any) {
+	outputErr("", format+"\n", args...)
 	os.Exit(1)
 }

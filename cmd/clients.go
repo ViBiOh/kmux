@@ -7,21 +7,25 @@ type kubeClient struct {
 	namespace string
 }
 
-func (kc kubeClient) execute(context string, action func(string, kubeClient)) {
-	action(context, kc)
+type kubeAction func(string, kubeClient) error
+
+func (kc kubeClient) execute(contextName string, action kubeAction) error {
+	return action(contextName, kc)
 }
 
 type kubeClients map[string]kubeClient
 
-func (kc kubeClients) execute(action func(string, kubeClient)) {
+func (kc kubeClients) execute(action kubeAction) {
 	concurrent := newConcurrent()
 
-	for context, client := range kc {
-		context := context
+	for contextName, client := range kc {
+		contextName := contextName
 		client := client
 
 		concurrent.run(func() {
-			client.execute(context, action)
+			if err := client.execute(contextName, action); err != nil {
+				outputErr(contextName, "%s", err)
+			}
 		})
 	}
 

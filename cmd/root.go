@@ -22,17 +22,19 @@ var rootCmd = &cobra.Command{
 		var err error
 		clients, err = getKubernetesClient(strings.Split(viper.GetString("context"), ","))
 		if err != nil {
-			displayErrorAndExit("%s", err)
+			outputErrAndExit("%s", err)
 		}
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		clients.execute(func(context string, client kubeClient) {
+		clients.execute(func(context string, client kubeClient) error {
 			info, err := client.clientset.Discovery().ServerVersion()
 			if err != nil {
-				displayErrorAndExit("unable to get server version: %s", err)
+				return fmt.Errorf("unable to get server version: %w", err)
 			}
 
-			displayOutput(context, "Cluster version: %s\nNamespace: %s", info, client.namespace)
+			outputStd(context, "Cluster version: %s\nNamespace: %s", info, client.namespace)
+
+			return nil
 		})
 	},
 }
@@ -72,7 +74,7 @@ func getKubernetesClient(contexts []string) (map[string]kubeClient, error) {
 func init() {
 	viper.AutomaticEnv()
 
-	flags := rootCmd.Flags()
+	flags := rootCmd.PersistentFlags()
 
 	var defaultConfig string
 	if home := homedir.HomeDir(); home != "" {
@@ -81,16 +83,18 @@ func init() {
 
 	flags.String("kubeconfig", defaultConfig, "Kubernetes configuration file")
 	if err := viper.BindPFlag("kubeconfig", flags.Lookup("kubeconfig")); err != nil {
-		displayErrorAndExit("unable to bind `kubeconfig` flag: %s", err)
+		outputErrAndExit("unable to bind `kubeconfig` flag: %s", err)
 	}
 
 	flags.String("context", "", "Kubernetes context, comma separated for mutiplexing commands")
 	if err := viper.BindPFlag("context", flags.Lookup("context")); err != nil {
-		displayErrorAndExit("unable bind `context` flag: %s", err)
+		outputErrAndExit("unable bind `context` flag: %s", err)
 	}
 	if err := viper.BindEnv("context", "KUBECONTEXT"); err != nil {
-		displayErrorAndExit("unable bind env `KUBECONTEXT`: %s", err)
+		outputErrAndExit("unable bind env `KUBECONTEXT`: %s", err)
 	}
+
+	rootCmd.AddCommand(imageCmd)
 }
 
 func Execute() {
