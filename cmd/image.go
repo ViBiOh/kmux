@@ -11,8 +11,10 @@ var imageCmd = &cobra.Command{
 	Use:   "image",
 	Short: "Get image name of containers for a given deployment",
 	Run: func(cmd *cobra.Command, args []string) {
+		deploymentName := args[0]
+
 		clients.execute(func(contextName string, client kubeClient) error {
-			deployment, err := client.clientset.AppsV1().Deployments(client.namespace).Get(context.Background(), args[0], v1.GetOptions{})
+			deployment, err := client.clientset.AppsV1().Deployments(client.namespace).Get(context.Background(), deploymentName, v1.GetOptions{})
 			if err != nil {
 				return err
 			}
