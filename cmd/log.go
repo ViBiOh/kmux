@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
@@ -14,10 +15,12 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
+var since time.Duration
+
 var logCmd = &cobra.Command{
-	Use:     "log",
+	Use:     "log <resource_type> <resource_name>",
 	Aliases: []string{"logs"},
-	Short:   "Get logs of a given resources",
+	Short:   "Get logs of a given resource",
 	Args:    cobra.ExactValidArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		ressourceType := args[0]
@@ -26,12 +29,14 @@ var logCmd = &cobra.Command{
 		var labelGetter func(context.Context, kubeClient, string) (string, error)
 
 		switch ressourceType {
-		case "deployment", "deployments":
+		case "deploy", "deployment", "deployments":
 			labelGetter = getDeploymentLabelSelector
-		case "cronjob", "cronjobs":
+		case "cj", "cronjob", "cronjobs":
 			labelGetter = getCronJobLabelSelector
 		case "job", "jobs":
 			labelGetter = getJobLabelSelector
+		case "ds", "daemonset", "daemonsets":
+			labelGetter = getDaemonSetLabelSelector
 		default:
 			outputErrAndExit("unhandled resource type for log: %s", ressourceType)
 			return
@@ -109,8 +114,23 @@ var logCmd = &cobra.Command{
 	},
 }
 
+func initLog() {
+	flags := logCmd.Flags()
+
+	flags.DurationVarP(&since, "since", "s", time.Hour, "Display logs since given duration")
+}
+
 func getDeploymentLabelSelector(ctx context.Context, client kubeClient, name string) (string, error) {
 	deployment, err := client.clientset.AppsV1().Deployments(client.namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	return toLabelSelector(deployment.Spec.Selector), nil
+}
+
+func getDaemonSetLabelSelector(ctx context.Context, client kubeClient, name string) (string, error) {
+	deployment, err := client.clientset.AppsV1().DaemonSets(client.namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -150,8 +170,11 @@ func toLabelSelector(selector *metav1.LabelSelector) string {
 }
 
 func streamPod(ctx context.Context, client kubeClient, contextName, namespace, name, container string) {
+	sinceSeconds := int64(since.Seconds())
+
 	stream, err := client.clientset.CoreV1().Pods(namespace).GetLogs(name, &v1.PodLogOptions{
-		Follow: true,
+		Follow:       true,
+		SinceSeconds: &sinceSeconds,
 	}).Stream(ctx)
 	if err != nil {
 		outputErr(contextName, "%s", err)

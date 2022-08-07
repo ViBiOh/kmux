@@ -106,6 +106,8 @@ func init() {
 	}
 
 	rootCmd.AddCommand(imageCmd)
+
+	initLog()
 	rootCmd.AddCommand(logCmd)
 }
 
