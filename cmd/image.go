@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 
+	"github.com/ViBiOh/kube/pkg/output"
 	"github.com/spf13/cobra"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -21,7 +22,7 @@ var imageCmd = &cobra.Command{
 			}
 
 			for _, container := range deployment.Spec.Template.Spec.Containers {
-				outputStd(contextName, "%s", container.Image)
+				output.Std(contextName, "%s", container.Image)
 			}
 
 			return nil

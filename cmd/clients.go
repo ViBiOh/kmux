@@ -1,6 +1,9 @@
 package cmd
 
-import "k8s.io/client-go/kubernetes"
+import (
+	"github.com/ViBiOh/kube/pkg/output"
+	"k8s.io/client-go/kubernetes"
+)
 
 type kubeClient struct {
 	clientset *kubernetes.Clientset
@@ -24,7 +27,7 @@ func (kc kubeClients) execute(action kubeAction) {
 
 		concurrent.run(func() {
 			if err := client.execute(contextName, action); err != nil {
-				outputErr(contextName, "%s", err)
+				output.Err(contextName, "%s", err)
 			}
 		})
 	}

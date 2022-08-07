@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ViBiOh/kube/pkg/output"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/client-go/kubernetes"
@@ -23,7 +24,7 @@ var rootCmd = &cobra.Command{
 		var err error
 		clients, err = getKubernetesClient(strings.Split(viper.GetString("context"), ","))
 		if err != nil {
-			outputErrAndExit("%s", err)
+			output.Fatal("%s", err)
 		}
 	},
 	Run: func(cmd *cobra.Command, args []string) {
@@ -33,7 +34,7 @@ var rootCmd = &cobra.Command{
 				return fmt.Errorf("get server version: %w", err)
 			}
 
-			outputStd(context, "Cluster version: %s\nNamespace: %s", info, client.namespace)
+			output.Std(context, "Cluster version: %s\nNamespace: %s", info, client.namespace)
 
 			return nil
 		})
@@ -89,20 +90,20 @@ func init() {
 
 	flags.String("kubeconfig", defaultConfig, "Kubernetes configuration file")
 	if err := viper.BindPFlag("kubeconfig", flags.Lookup("kubeconfig")); err != nil {
-		outputErrAndExit("bind `kubeconfig` flag: %s", err)
+		output.Fatal("bind `kubeconfig` flag: %s", err)
 	}
 
 	flags.String("context", "", "Kubernetes context, comma separated for mutiplexing commands")
 	if err := viper.BindPFlag("context", flags.Lookup("context")); err != nil {
-		outputErrAndExit("unable bind `context` flag: %s", err)
+		output.Fatal("unable bind `context` flag: %s", err)
 	}
 	if err := viper.BindEnv("context", "KUBECONTEXT"); err != nil {
-		outputErrAndExit("unable bind env `KUBECONTEXT`: %s", err)
+		output.Fatal("unable bind env `KUBECONTEXT`: %s", err)
 	}
 
 	flags.String("namespace", "", "Override kubernetes namespace in context")
 	if err := viper.BindPFlag("namespace", flags.Lookup("namespace")); err != nil {
-		outputErrAndExit("unable bind `namespace` flag: %s", err)
+		output.Fatal("unable bind `namespace` flag: %s", err)
 	}
 
 	rootCmd.AddCommand(imageCmd)

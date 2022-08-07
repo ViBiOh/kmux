@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ViBiOh/kube/pkg/output"
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +39,7 @@ var logCmd = &cobra.Command{
 		case "ds", "daemonset", "daemonsets":
 			labelGetter = getDaemonSetLabelSelector
 		default:
-			outputErrAndExit("unhandled resource type for log: %s", ressourceType)
+			output.Fatal("unhandled resource type for log: %s", ressourceType)
 			return
 		}
 
@@ -177,24 +178,24 @@ func streamPod(ctx context.Context, client kubeClient, contextName, namespace, n
 		SinceSeconds: &sinceSeconds,
 	}).Stream(ctx)
 	if err != nil {
-		outputErr(contextName, "%s", err)
+		output.Err(contextName, "%s", err)
 		return
 	}
 
 	defer func() {
 		if closeErr := stream.Close(); closeErr != nil {
-			outputErr(contextName, "close stream: %s", closeErr)
+			output.Err(contextName, "close stream: %s", closeErr)
 		}
 	}()
 
 	streamScanner := bufio.NewScanner(stream)
 	streamScanner.Split(bufio.ScanLines)
 
-	prefix := green(fmt.Sprintf("[%s/%s]", name, container))
+	prefix := output.Green(fmt.Sprintf("[%s/%s]", name, container))
 
 	for streamScanner.Scan() {
-		outputStd(contextName, "%s %s", prefix, streamScanner.Text())
+		output.Std(contextName, "%s %s", prefix, streamScanner.Text())
 	}
 
-	outputStdErr(contextName, "%s %s", prefix, yellow("Stream ended."))
+	output.StdErr(contextName, "%s %s", prefix, output.Yellow("Stream ended."))
 }
