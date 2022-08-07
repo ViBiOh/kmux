@@ -106,6 +106,7 @@ func init() {
 	}
 
 	rootCmd.AddCommand(imageCmd)
+	rootCmd.AddCommand(logCmd)
 }
 
 func Execute() {

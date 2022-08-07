@@ -8,8 +8,9 @@ import (
 )
 
 var imageCmd = &cobra.Command{
-	Use:   "image",
+	Use:   "image <deployment_name>",
 	Short: "Get image name of containers for a given deployment",
+	Args:  cobra.ExactValidArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		deploymentName := args[0]
 
