@@ -8,7 +8,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//nolint deadcode
+// nolint deadcode
 func getAllDeployments(name string) []string {
 	output := make(chan string, len(clients))
 	successChan := make(chan bool, len(clients))

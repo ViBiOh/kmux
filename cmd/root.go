@@ -30,7 +30,7 @@ var rootCmd = &cobra.Command{
 		clients.execute(func(context string, client kubeClient) error {
 			info, err := client.clientset.Discovery().ServerVersion()
 			if err != nil {
-				return fmt.Errorf("unable to get server version: %w", err)
+				return fmt.Errorf("get server version: %w", err)
 			}
 
 			outputStd(context, "Cluster version: %s\nNamespace: %s", info, client.namespace)
@@ -55,17 +55,17 @@ func getKubernetesClient(contexts []string) (map[string]kubeClient, error) {
 		clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(configRules, configOverrides)
 		k8sConfig, err := clientConfig.ClientConfig()
 		if err != nil {
-			return nil, fmt.Errorf("unable to read kubernetes config file: %w", err)
+			return nil, fmt.Errorf("read kubernetes config file: %w", err)
 		}
 
 		namespace, _, err := clientConfig.Namespace()
 		if err != nil {
-			return nil, fmt.Errorf("unable to read configured namespace: %w", err)
+			return nil, fmt.Errorf("read configured namespace: %w", err)
 		}
 
 		clientset, err := kubernetes.NewForConfig(k8sConfig)
 		if err != nil {
-			return nil, fmt.Errorf("unable to create kubernetes client: %w", err)
+			return nil, fmt.Errorf("create kubernetes client: %w", err)
 		}
 
 		output[context] = kubeClient{
@@ -89,7 +89,7 @@ func init() {
 
 	flags.String("kubeconfig", defaultConfig, "Kubernetes configuration file")
 	if err := viper.BindPFlag("kubeconfig", flags.Lookup("kubeconfig")); err != nil {
-		outputErrAndExit("unable to bind `kubeconfig` flag: %s", err)
+		outputErrAndExit("bind `kubeconfig` flag: %s", err)
 	}
 
 	flags.String("context", "", "Kubernetes context, comma separated for mutiplexing commands")
