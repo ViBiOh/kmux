@@ -20,8 +20,22 @@ var logCmd = &cobra.Command{
 	Short:   "Get logs of a given resources",
 	Args:    cobra.ExactValidArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		// ressourceType := args[0]
+		ressourceType := args[0]
 		resourceName := args[1]
+
+		var labelGetter func(context.Context, kubeClient, string) (string, error)
+
+		switch ressourceType {
+		case "deployment", "deployments":
+			labelGetter = getDeploymentLabelSelector
+		case "cronjob", "cronjobs":
+			labelGetter = getCronJobLabelSelector
+		case "job", "jobs":
+			labelGetter = getJobLabelSelector
+		default:
+			outputErrAndExit("unhandled resource type for log: %s", ressourceType)
+			return
+		}
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -32,7 +46,7 @@ var logCmd = &cobra.Command{
 		}()
 
 		clients.execute(func(contextName string, client kubeClient) error {
-			labelSelector, err := getDeploymentLabelSelector(ctx, client, resourceName)
+			labelSelector, err := labelGetter(ctx, client, resourceName)
 			if err != nil {
 				return err
 			}
@@ -101,15 +115,38 @@ func getDeploymentLabelSelector(ctx context.Context, client kubeClient, name str
 		return "", err
 	}
 
+	return toLabelSelector(deployment.Spec.Selector), nil
+}
+
+func getCronJobLabelSelector(ctx context.Context, client kubeClient, name string) (string, error) {
+	job, err := client.clientset.BatchV1().CronJobs(client.namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	return toLabelSelector(job.Spec.JobTemplate.Spec.Selector), nil
+}
+
+func getJobLabelSelector(ctx context.Context, client kubeClient, name string) (string, error) {
+	job, err := client.clientset.BatchV1().Jobs(client.namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	return toLabelSelector(job.Spec.Selector), nil
+}
+
+func toLabelSelector(selector *metav1.LabelSelector) string {
 	var labelSelector strings.Builder
-	for key, value := range deployment.Spec.Selector.MatchLabels {
+
+	for key, value := range selector.MatchLabels {
 		if labelSelector.Len() > 0 {
 			labelSelector.WriteString(",")
 		}
 		labelSelector.WriteString(fmt.Sprintf("%s=%s", key, value))
 	}
 
-	return labelSelector.String(), nil
+	return labelSelector.String()
 }
 
 func streamPod(ctx context.Context, client kubeClient, contextName, namespace, name, container string) {
