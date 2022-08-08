@@ -176,6 +176,7 @@ func streamPod(ctx context.Context, client kubeClient, contextName, namespace, n
 	stream, err := client.clientset.CoreV1().Pods(namespace).GetLogs(name, &v1.PodLogOptions{
 		Follow:       true,
 		SinceSeconds: &sinceSeconds,
+		Container:    container,
 	}).Stream(ctx)
 	if err != nil {
 		output.Err(contextName, "%s", err)
