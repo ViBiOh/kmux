@@ -16,7 +16,10 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
-var since time.Duration
+var (
+	since      time.Duration
+	containers []string
+)
 
 var logCmd = &cobra.Command{
 	Use:     "log <resource_type> <resource_name>",
@@ -77,17 +80,13 @@ var logCmd = &cobra.Command{
 					continue
 				}
 
-				if pod.Status.Phase == v1.PodPending {
-					continue
-				}
-
 				streamCancel, ok := onGoingStreams[pod.UID]
-
 				if event.Type == watch.Deleted || pod.Status.Phase == v1.PodSucceeded {
 					if ok {
 						streamCancel()
 						delete(onGoingStreams, pod.UID)
 					}
+
 					continue
 				}
 
@@ -95,17 +94,7 @@ var logCmd = &cobra.Command{
 					continue
 				}
 
-				for _, container := range pod.Spec.Containers {
-					streamCtx, streamCancel := context.WithCancel(ctx)
-					onGoingStreams[pod.UID] = streamCancel
-					container := container
-
-					streaming.run(func() {
-						defer streamCancel()
-
-						streamPod(streamCtx, client, contextName, pod.Namespace, pod.Name, container.Name)
-					})
-				}
+				handlePod(ctx, onGoingStreams, streaming, client, contextName, pod)
 			}
 
 			streaming.wait()
@@ -119,6 +108,74 @@ func initLog() {
 	flags := logCmd.Flags()
 
 	flags.DurationVarP(&since, "since", "s", time.Hour, "Display logs since given duration")
+	flags.StringSliceVarP(&containers, "containers", "c", nil, "Filter container's name, default to all containers")
+}
+
+func handlePod(ctx context.Context, onGoingStreams map[types.UID]func(), streaming *Concurrent, client kubeClient, contextName string, pod *v1.Pod) {
+	if pod.Status.Phase == v1.PodPending {
+		return
+	}
+
+	for _, container := range pod.Spec.Containers {
+		if !isContainerSelected(container) {
+			continue
+		}
+
+		streamCtx, streamCancel := context.WithCancel(ctx)
+		onGoingStreams[pod.UID] = streamCancel
+		container := container
+
+		streaming.run(func() {
+			defer streamCancel()
+
+			streamPod(streamCtx, client, contextName, pod.Namespace, pod.Name, container.Name)
+		})
+	}
+}
+
+func streamPod(ctx context.Context, client kubeClient, contextName, namespace, name, container string) {
+	sinceSeconds := int64(since.Seconds())
+
+	stream, err := client.clientset.CoreV1().Pods(namespace).GetLogs(name, &v1.PodLogOptions{
+		Follow:       true,
+		SinceSeconds: &sinceSeconds,
+		Container:    container,
+	}).Stream(ctx)
+	if err != nil {
+		output.Err(contextName, "%s", err)
+		return
+	}
+
+	defer func() {
+		if closeErr := stream.Close(); closeErr != nil {
+			output.Err(contextName, "close stream: %s", closeErr)
+		}
+	}()
+
+	streamScanner := bufio.NewScanner(stream)
+	streamScanner.Split(bufio.ScanLines)
+
+	prefix := output.Green(fmt.Sprintf("[%s/%s]", name, container))
+
+	for streamScanner.Scan() {
+		output.Std(contextName, "%s %s", prefix, streamScanner.Text())
+	}
+
+	output.StdErr(contextName, "%s %s", prefix, output.Yellow("Stream ended."))
+}
+
+func isContainerSelected(container v1.Container) bool {
+	if len(containers) == 0 {
+		return true
+	}
+
+	for _, containerName := range containers {
+		if strings.EqualFold(containerName, container.Name) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func getDeploymentLabelSelector(ctx context.Context, client kubeClient, name string) (string, error) {
@@ -168,35 +225,4 @@ func toLabelSelector(selector *metav1.LabelSelector) string {
 	}
 
 	return labelSelector.String()
-}
-
-func streamPod(ctx context.Context, client kubeClient, contextName, namespace, name, container string) {
-	sinceSeconds := int64(since.Seconds())
-
-	stream, err := client.clientset.CoreV1().Pods(namespace).GetLogs(name, &v1.PodLogOptions{
-		Follow:       true,
-		SinceSeconds: &sinceSeconds,
-		Container:    container,
-	}).Stream(ctx)
-	if err != nil {
-		output.Err(contextName, "%s", err)
-		return
-	}
-
-	defer func() {
-		if closeErr := stream.Close(); closeErr != nil {
-			output.Err(contextName, "close stream: %s", closeErr)
-		}
-	}()
-
-	streamScanner := bufio.NewScanner(stream)
-	streamScanner.Split(bufio.ScanLines)
-
-	prefix := output.Green(fmt.Sprintf("[%s/%s]", name, container))
-
-	for streamScanner.Scan() {
-		output.Std(contextName, "%s %s", prefix, streamScanner.Text())
-	}
-
-	output.StdErr(contextName, "%s %s", prefix, output.Yellow("Stream ended."))
 }
