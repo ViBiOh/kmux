@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/ViBiOh/kube/pkg/client"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -17,8 +18,8 @@ func getAllDeployments(name string) []string {
 		defer close(output)
 		defer close(successChan)
 
-		clients.execute(func(contextName string, client kubeClient) error {
-			list, err := client.clientset.AppsV1().Deployments("").List(context.Background(), v1.ListOptions{})
+		clients.Execute(func(kube client.Kube) error {
+			list, err := kube.AppsV1().Deployments("").List(context.Background(), v1.ListOptions{})
 			if err != nil {
 				return err
 			}

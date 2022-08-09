@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ViBiOh/kube/pkg/client"
 	"github.com/ViBiOh/kube/pkg/output"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -15,7 +16,7 @@ import (
 	"k8s.io/client-go/util/homedir"
 )
 
-var clients kubeClients
+var clients client.Array
 
 var rootCmd = &cobra.Command{
 	Use:   "kube",
@@ -27,22 +28,26 @@ var rootCmd = &cobra.Command{
 			output.Fatal("%s", err)
 		}
 	},
+	PersistentPostRun: func(_ *cobra.Command, _ []string) {
+		output.Close()
+		<-output.Done()
+	},
 	Run: func(cmd *cobra.Command, args []string) {
-		clients.execute(func(context string, client kubeClient) error {
-			info, err := client.clientset.Discovery().ServerVersion()
+		clients.Execute(func(kube client.Kube) error {
+			info, err := kube.Discovery().ServerVersion()
 			if err != nil {
 				return fmt.Errorf("get server version: %w", err)
 			}
 
-			output.Std(context, "Cluster version: %s\nNamespace: %s", info, client.namespace)
+			kube.Std("Cluster version: %s\nNamespace: %s", info, kube.Namespace)
 
 			return nil
 		})
 	},
 }
 
-func getKubernetesClient(contexts []string) (map[string]kubeClient, error) {
-	output := make(map[string]kubeClient)
+func getKubernetesClient(contexts []string) (client.Array, error) {
+	var output client.Array
 
 	for _, context := range contexts {
 		configOverrides := &clientcmd.ConfigOverrides{
@@ -69,10 +74,7 @@ func getKubernetesClient(contexts []string) (map[string]kubeClient, error) {
 			return nil, fmt.Errorf("create kubernetes client: %w", err)
 		}
 
-		output[context] = kubeClient{
-			clientset: clientset,
-			namespace: namespace,
-		}
+		output = append(output, client.New(context, namespace, clientset))
 	}
 
 	return output, nil
@@ -101,7 +103,7 @@ func init() {
 		output.Fatal("unable bind env `KUBECONTEXT`: %s", err)
 	}
 
-	flags.String("namespace", "", "Override kubernetes namespace in context")
+	flags.StringP("namespace", "n", "", "Override kubernetes namespace in context")
 	if err := viper.BindPFlag("namespace", flags.Lookup("namespace")); err != nil {
 		output.Fatal("unable bind `namespace` flag: %s", err)
 	}

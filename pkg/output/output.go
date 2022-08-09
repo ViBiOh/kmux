@@ -2,9 +2,7 @@ package output
 
 import (
 	"fmt"
-	"io"
 	"os"
-	"strings"
 
 	"github.com/fatih/color"
 )
@@ -16,33 +14,66 @@ var (
 	Yellow = color.New(color.FgYellow).SprintFunc()
 )
 
-func outputContent(output io.Writer, prefix, format string, args ...any) {
-	if len(prefix) > 0 {
-		prefix = Blue("[" + prefix + "] ")
-	}
-
-	for _, line := range strings.Split(fmt.Sprintf(format, args...), "\n") {
-		fmt.Fprint(output, prefix, line, "\n")
-	}
-}
-
 func Std(prefix, format string, args ...any) {
-	outputContent(os.Stdout, prefix, format, args...)
+	outputContent(true, prefix, format, args...)
 }
 
 func Warn(prefix, format string, args ...any) {
-	outputContent(os.Stderr, prefix, Yellow(fmt.Sprintf(format, args...)))
+	outputContent(false, prefix, Yellow(fmt.Sprintf(format, args...)))
 }
 
 func Err(prefix, format string, args ...any) {
-	outputContent(os.Stderr, prefix, Red(fmt.Sprintf(format, args...)))
+	outputContent(false, prefix, Red(fmt.Sprintf(format, args...)))
 }
 
-func StdErr(prefix, format string, args ...any) {
-	outputContent(os.Stderr, prefix, fmt.Sprintf(format, args...))
+func Info(prefix, format string, args ...any) {
+	outputContent(false, prefix, fmt.Sprintf(format, args...))
 }
 
 func Fatal(format string, args ...any) {
 	Err("", format+"\n", args...)
 	os.Exit(1)
+}
+
+type Outputter struct {
+	prefix string
+}
+
+func NewOutputter(name string) Outputter {
+	var prefix string
+
+	if len(name) != 0 {
+		prefix = Blue("[" + name + "] ")
+	}
+
+	return Outputter{
+		prefix: prefix,
+	}
+}
+
+func (o Outputter) Std(format string, args ...any) {
+	Std(o.prefix, format, args...)
+}
+
+func (o Outputter) Err(format string, args ...any) {
+	Err(o.prefix, format, args...)
+}
+
+func (o Outputter) Warn(format string, args ...any) {
+	Warn(o.prefix, format, args...)
+}
+
+func (o Outputter) Info(format string, args ...any) {
+	Info(o.prefix, format, args...)
+}
+
+func (o Outputter) Child(prefix string) Outputter {
+	if len(prefix) != 0 {
+		if len(o.prefix) > 0 {
+			o.prefix += " "
+		}
+		o.prefix += prefix + " "
+	}
+
+	return o
 }
