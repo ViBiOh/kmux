@@ -14,7 +14,7 @@ type event struct {
 
 var (
 	done       = make(chan struct{})
-	outputChan = make(chan event, 4)
+	outputChan = make(chan event, 8)
 )
 
 func init() {
@@ -22,7 +22,7 @@ func init() {
 }
 
 func print() {
-	close(done)
+	defer close(done)
 
 	for outputEvent := range outputChan {
 		for _, line := range strings.Split(outputEvent.message, "\n") {
@@ -49,8 +49,5 @@ func Done() <-chan struct{} {
 }
 
 func outputContent(std bool, prefix, format string, args ...any) {
-	select {
-	case outputChan <- event{std: std, prefix: prefix, message: fmt.Sprintf(format, args...)}:
-	default:
-	}
+	outputChan <- event{std: std, prefix: prefix, message: fmt.Sprintf(format, args...)}
 }

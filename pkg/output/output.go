@@ -31,7 +31,7 @@ func Info(prefix, format string, args ...any) {
 }
 
 func Fatal(format string, args ...any) {
-	Err("", format+"\n", args...)
+	fmt.Fprint(os.Stderr, Red(fmt.Sprintf(format, args...)))
 	os.Exit(1)
 }
 

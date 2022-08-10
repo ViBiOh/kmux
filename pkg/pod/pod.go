@@ -6,10 +6,26 @@ import (
 	"strings"
 
 	"github.com/ViBiOh/kube/pkg/client"
-	"github.com/ViBiOh/kube/pkg/output"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 )
+
+var Resources = []string{
+	"deployments",
+	"cronjobs",
+	"jobs",
+	"daemonsets",
+}
+
+var ResourcesAliases = []string{
+	"deploy",
+	"deployment",
+	"cj",
+	"cronjob",
+	"job",
+	"ds",
+	"daemonset",
+}
 
 type PodWatcher func(context.Context, client.Kube) (watch.Interface, error)
 
@@ -27,7 +43,7 @@ func WatcherLabelSelector(resourceType, resourceName string) PodWatcher {
 		case "ds", "daemonset", "daemonsets":
 			labelGetter = getDaemonSetLabelSelector
 		default:
-			output.Fatal("unhandled resource type for log: %s", resourceType)
+			return nil, fmt.Errorf("unhandled resource type for log: %s", resourceType)
 		}
 
 		labelSelector, err := labelGetter(ctx, kube, resourceName)
