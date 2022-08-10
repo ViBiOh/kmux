@@ -15,7 +15,14 @@ For example when you have multiple Kubernetes clusters you want to tail the logs
 Download the latest binary for your os and architecture from the [GitHub Releases page](https://github.com/ViBiOh/kube/releases)
 
 ```bash
-curl --disable --silent --show-error --location --max-time 300 --output "/usr/local/bin/kube" -- https://github.com/ViBiOh/kube/releases/download/v0.0.1/kube_$(uname -s | tr "[:upper:]" "[:lower:]")_amd64
+curl \
+  --disable \
+  --silent \
+  --show-error \
+  --location \
+  --max-time 300 \
+  --output "/usr/local/bin/kube"
+  https://github.com/ViBiOh/kube/releases/download/v0.0.2/kube_$(uname -s | tr "[:upper:]" "[:lower:]")_amd64
 chmod +x "/usr/local/bin/kube"
 ```
 
@@ -30,7 +37,7 @@ go install "github.com/ViBiOh/kube@latest"
 Shell completions are available by running the following command (example is for `bash`, but it's available for `zsh`, `fish` and `powershell`).
 
 ```bash
-source <(./bin/kube completion bash)
+source <(kube completion bash)
 ```
 
 You can also put in a dedicated file and source it from your `*sh.rc`
@@ -49,7 +56,7 @@ kube --context central1,europe1,asia1 image
 Global Flags:
       --context string      Kubernetes context, comma separated for mutiplexing commands
   -h, --help                help for kube
-      --kubeconfig string   Kubernetes configuration file (default "/Users/macbook/.kube/config")
+      --kubeconfig string   Kubernetes configuration file (default "${HOME}/.kube/config")
   -n, --namespace string    Override kubernetes namespace in context
 ```
 
