@@ -69,9 +69,6 @@ func (o Outputter) Info(format string, args ...any) {
 
 func (o Outputter) Child(prefix string) Outputter {
 	if len(prefix) != 0 {
-		if len(o.prefix) > 0 {
-			o.prefix += " "
-		}
 		o.prefix += prefix + " "
 	}
 
