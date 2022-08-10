@@ -70,14 +70,14 @@ var logCmd = &cobra.Command{
 		sinceSeconds = int64(since.Seconds())
 
 		clients.Execute(func(kube client.Kube) error {
-			podWatcher, err := resource.WatcherLabelSelector(resourceType, resourceName)(ctx, kube)
+			podWatcher, err := resource.GetPodWatcher(resourceType, resourceName)(ctx, kube)
 			if err != nil {
 				return err
 			}
 
 			defer podWatcher.Stop()
 
-			onGoingStreams := make(map[types.UID]func())
+			activeStreams := make(map[types.UID]func())
 
 			streaming := concurrent.NewSimple()
 
@@ -87,14 +87,14 @@ var logCmd = &cobra.Command{
 					continue
 				}
 
-				streamCancel, ok := onGoingStreams[pod.UID]
+				streamCancel, ok := activeStreams[pod.UID]
 
 				if event.Type == watch.Deleted || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
 					if ok {
 						streamCancel()
-						delete(onGoingStreams, pod.UID)
+						delete(activeStreams, pod.UID)
 					} else if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
-						handlePod(ctx, onGoingStreams, streaming, kube, pod)
+						handlePod(ctx, activeStreams, streaming, kube, pod)
 					}
 
 					continue
@@ -104,7 +104,7 @@ var logCmd = &cobra.Command{
 					continue
 				}
 
-				handlePod(ctx, onGoingStreams, streaming, kube, pod)
+				handlePod(ctx, activeStreams, streaming, kube, pod)
 			}
 
 			streaming.Wait()
@@ -122,7 +122,7 @@ func initLog() {
 	flags.BoolVarP(&dryRun, "dry-run", "d", false, "Dry-run, print only pods")
 }
 
-func handlePod(ctx context.Context, onGoingStreams map[types.UID]func(), streaming *concurrent.Simple, kube client.Kube, pod *v1.Pod) {
+func handlePod(ctx context.Context, activeStreams map[types.UID]func(), streaming *concurrent.Simple, kube client.Kube, pod *v1.Pod) {
 	for _, container := range pod.Spec.Containers {
 		if !isContainerSelected(container) {
 			continue
@@ -142,7 +142,7 @@ func handlePod(ctx context.Context, onGoingStreams map[types.UID]func(), streami
 			}
 
 			streamCtx, streamCancel := context.WithCancel(ctx)
-			onGoingStreams[pod.UID] = streamCancel
+			activeStreams[pod.UID] = streamCancel
 			defer streamCancel()
 
 			streamPod(streamCtx, kube, pod.Namespace, pod.Name, container.Name)

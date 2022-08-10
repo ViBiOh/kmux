@@ -11,37 +11,35 @@ import (
 )
 
 var Resources = []string{
-	"deployments",
 	"cronjobs",
-	"jobs",
 	"daemonsets",
-}
-
-var ResourcesAliases = []string{
-	"deploy",
-	"deployment",
-	"cj",
-	"cronjob",
-	"job",
-	"ds",
-	"daemonset",
+	"deployments",
+	"jobs",
+	"namespaces",
+	"services",
 }
 
 type PodWatcher func(context.Context, client.Kube) (watch.Interface, error)
 
-func WatcherLabelSelector(resourceType, resourceName string) PodWatcher {
+func GetPodWatcher(resourceType, resourceName string) PodWatcher {
 	return func(ctx context.Context, kube client.Kube) (watch.Interface, error) {
 		var labelGetter func(context.Context, client.Kube, string) (string, error)
 
 		switch resourceType {
-		case "deploy", "deployment", "deployments":
-			labelGetter = getDeploymentLabelSelector
 		case "cj", "cronjob", "cronjobs":
 			labelGetter = getCronJobLabelSelector
-		case "job", "jobs":
-			labelGetter = getJobLabelSelector
 		case "ds", "daemonset", "daemonsets":
 			labelGetter = getDaemonSetLabelSelector
+		case "deploy", "deployment", "deployments":
+			labelGetter = getDeploymentLabelSelector
+		case "job", "jobs":
+			labelGetter = getJobLabelSelector
+		case "ns", "namespace", "namespaces":
+			return kube.CoreV1().Pods(resourceName).Watch(ctx, metav1.ListOptions{
+				Watch: true,
+			})
+		case "svc", "service", "services":
+			labelGetter = getServiceLabelSelector
 		default:
 			return nil, fmt.Errorf("unhandled resource type `%s` for log", resourceType)
 		}
@@ -64,25 +62,34 @@ func getDeploymentLabelSelector(ctx context.Context, kube client.Kube, name stri
 		return "", err
 	}
 
-	return toLabelSelector(deployment.Spec.Selector), nil
+	return fromLabelSelector(deployment.Spec.Selector), nil
 }
 
 func getDaemonSetLabelSelector(ctx context.Context, kube client.Kube, name string) (string, error) {
-	deployment, err := kube.AppsV1().DaemonSets(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
+	daemonSet, err := kube.AppsV1().DaemonSets(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
 
-	return toLabelSelector(deployment.Spec.Selector), nil
+	return fromLabelSelector(daemonSet.Spec.Selector), nil
+}
+
+func getServiceLabelSelector(ctx context.Context, kube client.Kube, name string) (string, error) {
+	service, err := kube.CoreV1().Services(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	return fromLabels(service.Spec.Selector), nil
 }
 
 func getCronJobLabelSelector(ctx context.Context, kube client.Kube, name string) (string, error) {
-	job, err := kube.BatchV1().CronJobs(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
+	cronjob, err := kube.BatchV1().CronJobs(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
 
-	return toLabelSelector(job.Spec.JobTemplate.Spec.Selector), nil
+	return fromLabelSelector(cronjob.Spec.JobTemplate.Spec.Selector), nil
 }
 
 func getJobLabelSelector(ctx context.Context, kube client.Kube, name string) (string, error) {
@@ -91,13 +98,17 @@ func getJobLabelSelector(ctx context.Context, kube client.Kube, name string) (st
 		return "", err
 	}
 
-	return toLabelSelector(job.Spec.Selector), nil
+	return fromLabelSelector(job.Spec.Selector), nil
 }
 
-func toLabelSelector(selector *metav1.LabelSelector) string {
+func fromLabelSelector(selector *metav1.LabelSelector) string {
+	return fromLabels(selector.MatchLabels)
+}
+
+func fromLabels(labels map[string]string) string {
 	var labelSelector strings.Builder
 
-	for key, value := range selector.MatchLabels {
+	for key, value := range labels {
 		if labelSelector.Len() > 0 {
 			labelSelector.WriteString(",")
 		}
