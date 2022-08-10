@@ -8,6 +8,7 @@ import (
 
 	"github.com/ViBiOh/kube/pkg/client"
 	"github.com/ViBiOh/kube/pkg/output"
+	"github.com/ViBiOh/kube/pkg/resource"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/client-go/kubernetes"
@@ -97,15 +98,31 @@ func init() {
 
 	flags.String("context", "", "Kubernetes context, comma separated for mutiplexing commands")
 	if err := viper.BindPFlag("context", flags.Lookup("context")); err != nil {
-		output.Fatal("unable bind `context` flag: %s", err)
+		output.Fatal("bind `context` flag: %s", err)
 	}
 	if err := viper.BindEnv("context", "KUBECONTEXT"); err != nil {
-		output.Fatal("unable bind env `KUBECONTEXT`: %s", err)
+		output.Fatal("bind env `KUBECONTEXT`: %s", err)
 	}
 
 	flags.StringP("namespace", "n", "", "Override kubernetes namespace in context")
 	if err := viper.BindPFlag("namespace", flags.Lookup("namespace")); err != nil {
-		output.Fatal("unable bind `namespace` flag: %s", err)
+		output.Fatal("bind `namespace` flag: %s", err)
+	}
+
+	if err := rootCmd.RegisterFlagCompletionFunc("namespace", func(cmd *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+		lister, err := resource.ListerFor("namespace")
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+
+		clients, err = getKubernetesClient(strings.Split(viper.GetString("context"), ","))
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+
+		return getCommonObjects("", lister), cobra.ShellCompDirectiveDefault
+	}); err != nil {
+		output.Fatal("register `namespace` flag completion: %s", err)
 	}
 
 	rootCmd.AddCommand(imageCmd)

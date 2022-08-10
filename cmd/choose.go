@@ -2,15 +2,14 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"sort"
 
 	"github.com/ViBiOh/kube/pkg/client"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/ViBiOh/kube/pkg/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// nolint deadcode
-func getAllDeployments(name string) []string {
+func getCommonObjects(namespace string, lister resource.Lister) []string {
 	output := make(chan string, len(clients))
 	successChan := make(chan bool, len(clients))
 
@@ -19,13 +18,17 @@ func getAllDeployments(name string) []string {
 		defer close(successChan)
 
 		clients.Execute(func(kube client.Kube) error {
-			list, err := kube.AppsV1().Deployments("").List(context.Background(), v1.ListOptions{})
+			if len(namespace) == 0 {
+				namespace = kube.Namespace
+			}
+
+			items, err := lister(context.Background(), kube, namespace, metav1.ListOptions{})
 			if err != nil {
 				return err
 			}
 
-			for _, deployment := range list.Items {
-				output <- fmt.Sprintf("%s/%s", deployment.GetNamespace(), deployment.GetName())
+			for _, deployment := range items {
+				output <- deployment.GetName()
 			}
 
 			successChan <- true

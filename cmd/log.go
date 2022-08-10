@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"syscall"
 	"time"
@@ -12,27 +13,42 @@ import (
 	"github.com/ViBiOh/kube/pkg/client"
 	"github.com/ViBiOh/kube/pkg/concurrent"
 	"github.com/ViBiOh/kube/pkg/output"
-	"github.com/ViBiOh/kube/pkg/pod"
+	"github.com/ViBiOh/kube/pkg/resource"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 )
 
 var (
-	dryRun     bool
-	since      time.Duration
-	containers []string
+	dryRun       bool
+	since        time.Duration
+	sinceSeconds int64
+	containers   []string
 )
 
 var logCmd = &cobra.Command{
-	Use:        "log <resource_type> <resource_name>",
-	Aliases:    []string{"logs"},
-	Short:      "Get logs of a given resource",
-	ArgAliases: pod.ResourcesAliases,
+	Use:     "log <resource_type> <resource_name>",
+	Aliases: []string{"logs"},
+	Short:   "Get logs of a given resource",
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
-			return pod.Resources, cobra.ShellCompDirectiveNoFileComp
+			return resource.Resources, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		if len(args) == 1 {
+			lister, err := resource.ListerFor(args[0])
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveError
+			}
+
+			clients, err = getKubernetesClient(strings.Split(viper.GetString("context"), ","))
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveError
+			}
+
+			return getCommonObjects(viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
 		}
 
 		return nil, cobra.ShellCompDirectiveNoFileComp
@@ -51,8 +67,10 @@ var logCmd = &cobra.Command{
 			cancel()
 		}()
 
+		sinceSeconds = int64(since.Seconds())
+
 		clients.Execute(func(kube client.Kube) error {
-			podWatcher, err := pod.WatcherLabelSelector(resourceType, resourceName)(ctx, kube)
+			podWatcher, err := resource.WatcherLabelSelector(resourceType, resourceName)(ctx, kube)
 			if err != nil {
 				return err
 			}
@@ -82,7 +100,7 @@ var logCmd = &cobra.Command{
 					continue
 				}
 
-				if ok {
+				if ok || pod.Status.Phase == v1.PodPending {
 					continue
 				}
 
@@ -105,14 +123,11 @@ func initLog() {
 }
 
 func handlePod(ctx context.Context, onGoingStreams map[types.UID]func(), streaming *concurrent.Simple, kube client.Kube, pod *v1.Pod) {
-	if pod.Status.Phase == v1.PodPending {
-		return
-	}
-
 	for _, container := range pod.Spec.Containers {
 		if !isContainerSelected(container) {
 			continue
 		}
+
 		container := container
 
 		if dryRun {
@@ -136,8 +151,6 @@ func handlePod(ctx context.Context, onGoingStreams map[types.UID]func(), streami
 }
 
 func logPod(ctx context.Context, kube client.Kube, namespace, name, container string) {
-	sinceSeconds := int64(since.Seconds())
-
 	content, err := kube.CoreV1().Pods(namespace).GetLogs(name, &v1.PodLogOptions{
 		SinceSeconds: &sinceSeconds,
 		Container:    container,
@@ -147,20 +160,10 @@ func logPod(ctx context.Context, kube client.Kube, namespace, name, container st
 		return
 	}
 
-	outputter := kube.Child(output.Green(fmt.Sprintf("[%s/%s]", name, container)))
-	defer outputter.Info(output.Yellow("Log ended."))
-
-	streamScanner := bufio.NewScanner(bytes.NewReader(content))
-	streamScanner.Split(bufio.ScanLines)
-
-	for streamScanner.Scan() {
-		outputter.Std(streamScanner.Text())
-	}
+	outputLog(bytes.NewReader(content), kube, name, container)
 }
 
 func streamPod(ctx context.Context, kube client.Kube, namespace, name, container string) {
-	sinceSeconds := int64(since.Seconds())
-
 	stream, err := kube.CoreV1().Pods(namespace).GetLogs(name, &v1.PodLogOptions{
 		Follow:       true,
 		SinceSeconds: &sinceSeconds,
@@ -177,12 +180,16 @@ func streamPod(ctx context.Context, kube client.Kube, namespace, name, container
 		}
 	}()
 
+	outputLog(stream, kube, name, container)
+}
+
+func outputLog(reader io.Reader, kube client.Kube, name, container string) {
 	outputter := kube.Child(output.Green(fmt.Sprintf("[%s/%s]", name, container)))
 
-	outputter.Info(output.Yellow("Streaming log..."))
-	defer outputter.Info(output.Yellow("Streaming ended."))
+	outputter.Info(output.Yellow("Starting log..."))
+	defer outputter.Info(output.Yellow("Log ended."))
 
-	streamScanner := bufio.NewScanner(stream)
+	streamScanner := bufio.NewScanner(reader)
 	streamScanner.Split(bufio.ScanLines)
 
 	for streamScanner.Scan() {

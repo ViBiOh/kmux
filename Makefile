@@ -62,7 +62,7 @@ format:
 ## style: Check lint, code styling rules. e.g. pylint, phpcs, eslint, style (java) etc ...
 .PHONY: style
 style:
-	golangci-lint run
+	golangci-lint run --timeout 5m
 
 ## test: Shortcut to launch all the test tasks (unit, functional and integration).
 .PHONY: test

@@ -1,4 +1,4 @@
-package pod
+package resource
 
 import (
 	"context"
@@ -43,7 +43,7 @@ func WatcherLabelSelector(resourceType, resourceName string) PodWatcher {
 		case "ds", "daemonset", "daemonsets":
 			labelGetter = getDaemonSetLabelSelector
 		default:
-			return nil, fmt.Errorf("unhandled resource type for log: %s", resourceType)
+			return nil, fmt.Errorf("unhandled resource type `%s` for log", resourceType)
 		}
 
 		labelSelector, err := labelGetter(ctx, kube, resourceName)
