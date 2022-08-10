@@ -91,11 +91,11 @@ var restartCmd = &cobra.Command{
 				job.Spec.Selector = nil
 				job.Spec.Template.ObjectMeta.Labels = nil
 
-				if err = kube.BatchV1().Jobs(kube.Namespace).Delete(context.Background(), resourceName, v1.DeleteOptions{}); err != nil {
+				if err = kube.BatchV1().Jobs(kube.Namespace).Delete(ctx, resourceName, v1.DeleteOptions{}); err != nil {
 					return err
 				}
 
-				_, err = kube.BatchV1().Jobs(kube.Namespace).Create(context.Background(), job, v1.CreateOptions{})
+				_, err = kube.BatchV1().Jobs(kube.Namespace).Create(ctx, job, v1.CreateOptions{})
 				return err
 			case "sts", "statefulset", "statefulsets":
 				_, err := kube.AppsV1().StatefulSets(kube.Namespace).Patch(ctx, resourceName, types.MergePatchType, payload, v1.PatchOptions{})
