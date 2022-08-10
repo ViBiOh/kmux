@@ -53,7 +53,6 @@ var logCmd = &cobra.Command{
 
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
-
 	Args: cobra.ExactValidArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		resourceType := args[0]

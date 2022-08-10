@@ -38,6 +38,8 @@ func GetPodWatcher(resourceType, resourceName string) PodWatcher {
 			return kube.CoreV1().Pods(resourceName).Watch(ctx, metav1.ListOptions{
 				Watch: true,
 			})
+		case "sts", "statefulset", "statefulsets":
+			labelGetter = getStatefulSetSelector
 		case "svc", "service", "services":
 			labelGetter = getServiceLabelSelector
 		default:
@@ -56,13 +58,13 @@ func GetPodWatcher(resourceType, resourceName string) PodWatcher {
 	}
 }
 
-func getDeploymentLabelSelector(ctx context.Context, kube client.Kube, name string) (string, error) {
-	deployment, err := kube.AppsV1().Deployments(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
+func getCronJobLabelSelector(ctx context.Context, kube client.Kube, name string) (string, error) {
+	cronjob, err := kube.BatchV1().CronJobs(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
 
-	return fromLabelSelector(deployment.Spec.Selector), nil
+	return fromLabelSelector(cronjob.Spec.JobTemplate.Spec.Selector), nil
 }
 
 func getDaemonSetLabelSelector(ctx context.Context, kube client.Kube, name string) (string, error) {
@@ -74,22 +76,13 @@ func getDaemonSetLabelSelector(ctx context.Context, kube client.Kube, name strin
 	return fromLabelSelector(daemonSet.Spec.Selector), nil
 }
 
-func getServiceLabelSelector(ctx context.Context, kube client.Kube, name string) (string, error) {
-	service, err := kube.CoreV1().Services(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
+func getDeploymentLabelSelector(ctx context.Context, kube client.Kube, name string) (string, error) {
+	deployment, err := kube.AppsV1().Deployments(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
 
-	return fromLabels(service.Spec.Selector), nil
-}
-
-func getCronJobLabelSelector(ctx context.Context, kube client.Kube, name string) (string, error) {
-	cronjob, err := kube.BatchV1().CronJobs(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-
-	return fromLabelSelector(cronjob.Spec.JobTemplate.Spec.Selector), nil
+	return fromLabelSelector(deployment.Spec.Selector), nil
 }
 
 func getJobLabelSelector(ctx context.Context, kube client.Kube, name string) (string, error) {
@@ -99,6 +92,24 @@ func getJobLabelSelector(ctx context.Context, kube client.Kube, name string) (st
 	}
 
 	return fromLabelSelector(job.Spec.Selector), nil
+}
+
+func getStatefulSetSelector(ctx context.Context, kube client.Kube, name string) (string, error) {
+	statefulSet, err := kube.AppsV1().StatefulSets(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	return fromLabelSelector(statefulSet.Spec.Selector), nil
+}
+
+func getServiceLabelSelector(ctx context.Context, kube client.Kube, name string) (string, error) {
+	service, err := kube.CoreV1().Services(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	return fromLabels(service.Spec.Selector), nil
 }
 
 func fromLabelSelector(selector *metav1.LabelSelector) string {

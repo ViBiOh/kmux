@@ -126,6 +126,7 @@ func init() {
 	}
 
 	rootCmd.AddCommand(imageCmd)
+	rootCmd.AddCommand(restartCmd)
 
 	initLog()
 	rootCmd.AddCommand(logCmd)

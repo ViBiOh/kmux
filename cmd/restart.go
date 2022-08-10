@@ -1,0 +1,108 @@
+package cmd
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/ViBiOh/kube/pkg/client"
+	"github.com/ViBiOh/kube/pkg/output"
+	"github.com/ViBiOh/kube/pkg/resource"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+)
+
+type restartPatch struct {
+	Spec struct {
+		Template struct {
+			Metadata struct {
+				Annotations map[string]string `json:"annotations"`
+			} `json:"metadata"`
+		} `json:"template"`
+	} `json:"spec"`
+}
+
+var restartCmd = &cobra.Command{
+	Use:   "restart <resource_type> <resource_name>",
+	Short: "Restart pod of the given resources",
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return []string{
+				"daemonsets",
+				"deployments",
+				"jobs",
+				"statefulsets",
+			}, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		if len(args) == 1 {
+			lister, err := resource.ListerFor(args[0])
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveError
+			}
+
+			clients, err = getKubernetesClient(strings.Split(viper.GetString("context"), ","))
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveError
+			}
+
+			return getCommonObjects(viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
+		}
+
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
+	Args: cobra.ExactValidArgs(2),
+	Run: func(cmd *cobra.Command, args []string) {
+		resourceType := args[0]
+		resourceName := args[1]
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		var patch restartPatch
+		patch.Spec.Template.Metadata.Annotations = map[string]string{
+			"kube.vibioh.fr/restartedAt": time.Now().Format(time.RFC3339),
+		}
+
+		payload, err := json.Marshal(patch)
+		if err != nil {
+			output.Err("", "marshal patch: %s", err)
+			return
+		}
+
+		clients.Execute(func(kube client.Kube) error {
+			switch resourceType {
+			case "ds", "daemonset", "daemonsets":
+				_, err := kube.AppsV1().DaemonSets(kube.Namespace).Patch(ctx, resourceName, types.MergePatchType, payload, v1.PatchOptions{})
+				return err
+			case "deploy", "deployment", "deployments":
+				_, err := kube.AppsV1().Deployments(kube.Namespace).Patch(ctx, resourceName, types.MergePatchType, payload, v1.PatchOptions{})
+				return err
+			case "job", "jobs":
+				job, err := kube.BatchV1().Jobs(kube.Namespace).Get(ctx, resourceName, v1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				job.Spec.Selector = nil
+				job.Spec.Template.ObjectMeta.Labels = nil
+
+				if err = kube.BatchV1().Jobs(kube.Namespace).Delete(context.Background(), resourceName, v1.DeleteOptions{}); err != nil {
+					return err
+				}
+
+				_, err = kube.BatchV1().Jobs(kube.Namespace).Create(context.Background(), job, v1.CreateOptions{})
+				return err
+			case "sts", "statefulset", "statefulsets":
+				_, err := kube.AppsV1().StatefulSets(kube.Namespace).Patch(ctx, resourceName, types.MergePatchType, payload, v1.PatchOptions{})
+				return err
+			default:
+				return fmt.Errorf("unhandled resource type `%s` for restart", resourceType)
+			}
+		})
+	},
+}
