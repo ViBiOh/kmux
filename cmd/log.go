@@ -34,7 +34,15 @@ var logCmd = &cobra.Command{
 	Short:   "Get logs of a given resource",
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
-			return resource.Resources, cobra.ShellCompDirectiveNoFileComp
+			return []string{
+				"cronjobs",
+				"daemonsets",
+				"deployments",
+				"jobs",
+				"namespaces",
+				"services",
+				"nodes",
+			}, cobra.ShellCompDirectiveNoFileComp
 		}
 
 		if len(args) == 1 {

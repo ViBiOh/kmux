@@ -10,15 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
-var Resources = []string{
-	"cronjobs",
-	"daemonsets",
-	"deployments",
-	"jobs",
-	"namespaces",
-	"services",
-}
-
 type PodWatcher func(context.Context, client.Kube) (watch.Interface, error)
 
 func GetPodWatcher(resourceType, resourceName string) PodWatcher {
@@ -29,6 +20,12 @@ func GetPodWatcher(resourceType, resourceName string) PodWatcher {
 		case "ns", "namespace", "namespaces":
 			return kube.CoreV1().Pods(resourceName).Watch(ctx, metav1.ListOptions{
 				Watch: true,
+			})
+
+		case "no", "node", "nodes":
+			return kube.CoreV1().Pods(kube.Namespace).Watch(ctx, metav1.ListOptions{
+				FieldSelector: fmt.Sprintf("spec.nodeName=%s", resourceName),
+				Watch:         true,
 			})
 
 		case "svc", "service", "services":
