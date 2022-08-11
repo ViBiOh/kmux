@@ -18,7 +18,7 @@ func getCommonObjects(namespace string, lister resource.Lister) []string {
 		defer close(successChan)
 
 		clients.Execute(func(kube client.Kube) error {
-			if len(namespace) == 0 {
+			if len(namespace) == 0 && !allNamespace {
 				namespace = kube.Namespace
 			}
 

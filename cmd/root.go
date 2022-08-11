@@ -17,7 +17,10 @@ import (
 	"k8s.io/client-go/util/homedir"
 )
 
-var clients client.Array
+var (
+	clients      client.Array
+	allNamespace bool
+)
 
 var rootCmd = &cobra.Command{
 	Use:   "kmux",
@@ -70,6 +73,10 @@ func getKubernetesClient(contexts []string) (client.Array, error) {
 			return nil, fmt.Errorf("read configured namespace: %w", err)
 		}
 
+		if allNamespace {
+			namespace = ""
+		}
+
 		clientset, err := kubernetes.NewForConfig(k8sConfig)
 		if err != nil {
 			return nil, fmt.Errorf("create kubernetes client: %w", err)
@@ -103,6 +110,8 @@ func init() {
 	if err := viper.BindEnv("context", "KUBECONTEXT"); err != nil {
 		output.Fatal("bind env `KUBECONTEXT`: %s", err)
 	}
+
+	flags.BoolVarP(&allNamespace, "all-namespaces", "A", false, "Find resources in all namespaces")
 
 	flags.StringP("namespace", "n", "", "Override kubernetes namespace in context")
 	if err := viper.BindPFlag("namespace", flags.Lookup("namespace")); err != nil {

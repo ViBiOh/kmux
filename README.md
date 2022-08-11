@@ -32,7 +32,7 @@ chmod +x "/usr/local/bin/kmux"
 go install "github.com/ViBiOh/kmux@latest"
 ```
 
-### {ba,z}sh-completion
+### Shell completions
 
 Shell completions are available by running the following command (example is for `bash`, but it's available for `zsh`, `fish` and `powershell`).
 
@@ -54,6 +54,7 @@ kmux --context central1,europe1,asia1 image
 
 ```
 Global Flags:
+  -A, --all-namespaces      Find resources in all namespaces
       --context string      Kubernetes context, comma separated for mutiplexing commands
   -h, --help                help for kmux
       --kubeconfig string   Kubernetes configuration file (default "${HOME}/.kube/config")

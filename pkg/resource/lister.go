@@ -82,6 +82,34 @@ func ListerFor(resourceType string) (Lister, error) {
 
 			return output, nil
 		}, nil
+	case "no", "node", "nodes":
+		return func(ctx context.Context, kube client.Kube, _ string, options metav1.ListOptions) ([]metav1.ObjectMeta, error) {
+			items, err := kube.CoreV1().Nodes().List(ctx, options)
+			if err != nil {
+				return nil, err
+			}
+
+			output := make([]metav1.ObjectMeta, len(items.Items))
+			for i, item := range items.Items {
+				output[i] = item.ObjectMeta
+			}
+
+			return output, nil
+		}, nil
+	case "svc", "service", "services":
+		return func(ctx context.Context, kube client.Kube, namespace string, options metav1.ListOptions) ([]metav1.ObjectMeta, error) {
+			items, err := kube.CoreV1().Services(namespace).List(ctx, options)
+			if err != nil {
+				return nil, err
+			}
+
+			output := make([]metav1.ObjectMeta, len(items.Items))
+			for i, item := range items.Items {
+				output[i] = item.ObjectMeta
+			}
+
+			return output, nil
+		}, nil
 	case "sts", "statefulset", "statefulsets":
 		return func(ctx context.Context, kube client.Kube, namespace string, options metav1.ListOptions) ([]metav1.ObjectMeta, error) {
 			items, err := kube.AppsV1().StatefulSets(namespace).List(ctx, options)
