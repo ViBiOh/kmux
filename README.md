@@ -85,9 +85,22 @@ Flags:
   -s, --since duration       Display logs since given duration (default 1h0m0s)
 ```
 
+### `watch`
+
+`watch` for all pods in a given namespace (or all namespaces). Status phase is done in a nearly same way that the official `kubectl` (computing the status of a Pod is not that easy).
+
+Output is colored according to the current status of the pod, for better clarity.
+
+```
+Get all pods in the namespace
+
+Usage:
+  kmux watch
+```
+
 ### `restart`
 
-`restart` performat the equivalent of a rollout restart on given resource (add an annotation of the pod spec). For `job`, it's the equivalent of a replace (delete then create).
+`restart` perform the equivalent of a rollout restart on given resource (add an annotation of the pod spec). For `job`, it's the equivalent of a replace (delete then create).
 
 ```
 Restart pod of the given resources

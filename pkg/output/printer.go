@@ -7,9 +7,9 @@ import (
 )
 
 type event struct {
-	std     bool
 	prefix  string
 	message string
+	std     bool
 }
 
 var (

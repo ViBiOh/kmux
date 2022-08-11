@@ -8,10 +8,12 @@ import (
 )
 
 var (
-	Red    = color.New(color.FgRed).SprintFunc()
-	Green  = color.New(color.FgGreen).SprintFunc()
-	Blue   = color.New(color.FgBlue).SprintFunc()
-	Yellow = color.New(color.FgYellow).SprintFunc()
+	Red     = color.New(color.FgRed).SprintFunc()
+	Green   = color.New(color.FgGreen).SprintFunc()
+	Blue    = color.New(color.FgBlue).SprintFunc()
+	Yellow  = color.New(color.FgYellow).SprintFunc()
+	Cyan    = color.New(color.FgCyan).SprintFunc()
+	Magenta = color.New(color.FgMagenta).SprintFunc()
 )
 
 func Std(prefix, format string, args ...any) {
