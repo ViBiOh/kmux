@@ -185,7 +185,7 @@ func streamPod(ctx context.Context, kube client.Kube, namespace, name, container
 func outputLog(reader io.Reader, kube client.Kube, name, container string) {
 	outputter := kube.Child(output.Green(fmt.Sprintf("[%s/%s]", name, container)))
 
-	outputter.Info(output.Yellow("Starting log..."))
+	outputter.Info(output.Yellow("Log..."))
 	defer outputter.Info(output.Yellow("Log ended."))
 
 	streamScanner := bufio.NewScanner(reader)

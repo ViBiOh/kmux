@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"syscall"
 
@@ -10,8 +9,6 @@ import (
 	"github.com/ViBiOh/kmux/pkg/resource"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var imageCmd = &cobra.Command{
@@ -58,49 +55,16 @@ var imageCmd = &cobra.Command{
 		}()
 
 		clients.Execute(func(kube client.Kube) error {
-			var containers []v1.Container
-
-			switch resourceType {
-			case "cronjob", "cronjobs":
-				item, err := kube.BatchV1().CronJobs(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
-				if err != nil {
-					return err
-				}
-
-				containers = item.Spec.JobTemplate.Spec.Template.Spec.Containers
-			case "ds", "daemonset", "daemonsets":
-				item, err := kube.AppsV1().DaemonSets(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
-				if err != nil {
-					return err
-				}
-
-				containers = item.Spec.Template.Spec.Containers
-			case "deploy", "deployment", "deployments":
-				item, err := kube.AppsV1().Deployments(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
-				if err != nil {
-					return err
-				}
-
-				containers = item.Spec.Template.Spec.Containers
-			case "job", "jobs":
-				item, err := kube.BatchV1().Jobs(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
-				if err != nil {
-					return err
-				}
-
-				containers = item.Spec.Template.Spec.Containers
-			case "sts", "statefulset", "statefulsets":
-				item, err := kube.AppsV1().StatefulSets(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
-				if err != nil {
-					return err
-				}
-
-				containers = item.Spec.Template.Spec.Containers
-			default:
-				return fmt.Errorf("unhandled resource type `%s` for image", resourceType)
+			podTemplate, err := resource.PodTemplateGetter(ctx, kube, resourceType, resourceName)
+			if err != nil {
+				return err
 			}
 
-			for _, container := range containers {
+			for _, container := range podTemplate.Spec.InitContainers {
+				kube.Std("%s", container.Image)
+			}
+
+			for _, container := range podTemplate.Spec.Containers {
 				kube.Std("%s", container.Image)
 			}
 
