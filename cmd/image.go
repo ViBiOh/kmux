@@ -16,7 +16,7 @@ import (
 
 var imageCmd = &cobra.Command{
 	Use:   "image <resource_type> <resource_name>",
-	Short: "Get image name of containers for a given resource",
+	Short: "Get all image names of containers for a given resource",
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
 			return []string{
