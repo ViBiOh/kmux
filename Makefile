@@ -5,7 +5,7 @@ ifneq ("$(wildcard .env)","")
 	export
 endif
 
-APP_NAME = kube
+APP_NAME = kmux
 PACKAGES ?= ./...
 
 MAIN_SOURCE = main.go

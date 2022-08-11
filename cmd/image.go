@@ -6,8 +6,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/ViBiOh/kube/pkg/client"
-	"github.com/ViBiOh/kube/pkg/resource"
+	"github.com/ViBiOh/kmux/pkg/client"
+	"github.com/ViBiOh/kmux/pkg/resource"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	v1 "k8s.io/api/core/v1"

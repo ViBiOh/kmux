@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ViBiOh/kube/pkg/client"
-	"github.com/ViBiOh/kube/pkg/output"
-	"github.com/ViBiOh/kube/pkg/resource"
+	"github.com/ViBiOh/kmux/pkg/client"
+	"github.com/ViBiOh/kmux/pkg/output"
+	"github.com/ViBiOh/kmux/pkg/resource"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,7 +65,7 @@ var restartCmd = &cobra.Command{
 
 		var patch restartPatch
 		patch.Spec.Template.Metadata.Annotations = map[string]string{
-			"kube.vibioh.fr/restartedAt": time.Now().Format(time.RFC3339),
+			"kmux.vibioh.fr/restartedAt": time.Now().Format(time.RFC3339),
 		}
 
 		payload, err := json.Marshal(patch)

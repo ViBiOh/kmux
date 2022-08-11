@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/ViBiOh/kube/cmd"
+	"github.com/ViBiOh/kmux/cmd"
 )
 
 func main() {

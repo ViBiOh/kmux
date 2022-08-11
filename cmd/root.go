@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ViBiOh/kube/pkg/client"
-	"github.com/ViBiOh/kube/pkg/output"
-	"github.com/ViBiOh/kube/pkg/resource"
+	"github.com/ViBiOh/kmux/pkg/client"
+	"github.com/ViBiOh/kmux/pkg/output"
+	"github.com/ViBiOh/kmux/pkg/resource"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/client-go/kubernetes"
@@ -20,8 +20,8 @@ import (
 var clients client.Array
 
 var rootCmd = &cobra.Command{
-	Use:   "kube",
-	Short: "Kube simplify use of kubectl",
+	Use:   "kmux",
+	Short: "Multiplexing kubectl common tasks accross clusters",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		var err error
 		clients, err = getKubernetesClient(strings.Split(viper.GetString("context"), ","))

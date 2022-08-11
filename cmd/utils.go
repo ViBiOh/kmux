@@ -4,7 +4,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/ViBiOh/kube/pkg/output"
+	"github.com/ViBiOh/kmux/pkg/output"
 )
 
 func waitForEnd(signals ...os.Signal) {

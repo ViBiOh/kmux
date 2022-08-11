@@ -1,8 +1,8 @@
 package client
 
 import (
-	"github.com/ViBiOh/kube/pkg/concurrent"
-	"github.com/ViBiOh/kube/pkg/output"
+	"github.com/ViBiOh/kmux/pkg/concurrent"
+	"github.com/ViBiOh/kmux/pkg/output"
 	"k8s.io/client-go/kubernetes"
 )
 

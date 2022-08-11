@@ -1,10 +1,10 @@
-# kube
+# kmux
 
-[![Build](https://github.com/ViBiOh/kube/workflows/Build/badge.svg)](https://github.com/ViBiOh/kube/actions)
-[![codecov](https://codecov.io/gh/ViBiOh/kube/branch/main/graph/badge.svg)](https://codecov.io/gh/ViBiOh/kube)
+[![Build](https://github.com/ViBiOh/kmux/workflows/Build/badge.svg)](https://github.com/ViBiOh/kmux/actions)
+[![codecov](https://codecov.io/gh/ViBiOh/kmux/branch/main/graph/badge.svg)](https://codecov.io/gh/ViBiOh/kmux)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=ViBiOh_kube&metric=alert_status)](https://sonarcloud.io/dashboard?id=ViBiOh_kube)
 
-`kube` is a tool for executing common Kubernetes actions on one or many clusters at the same time.
+`kmux` is a tool for executing common Kubernetes actions on one or many clusters at the same time.
 
 For example when you have multiple Kubernetes clusters you want to tail the logs of the same deployment simultaneously, or check the image deployed on each cluster.
 
@@ -12,7 +12,7 @@ For example when you have multiple Kubernetes clusters you want to tail the logs
 
 ### Release
 
-Download the latest binary for your os and architecture from the [GitHub Releases page](https://github.com/ViBiOh/kube/releases)
+Download the latest binary for your os and architecture from the [GitHub Releases page](https://github.com/ViBiOh/kmux/releases)
 
 ```bash
 curl \
@@ -21,15 +21,15 @@ curl \
   --show-error \
   --location \
   --max-time 300 \
-  --output "/usr/local/bin/kube"
-  https://github.com/ViBiOh/kube/releases/download/v0.0.2/kube_$(uname -s | tr "[:upper:]" "[:lower:]")_amd64
-chmod +x "/usr/local/bin/kube"
+  --output "/usr/local/bin/kmux"
+  https://github.com/ViBiOh/kmux/releases/download/v0.0.2/kube_$(uname -s | tr "[:upper:]" "[:lower:]")_amd64
+chmod +x "/usr/local/bin/kmux"
 ```
 
 ### Golang
 
 ```bash
-go install "github.com/ViBiOh/kube@latest"
+go install "github.com/ViBiOh/kmux@latest"
 ```
 
 ### {ba,z}sh-completion
@@ -37,7 +37,7 @@ go install "github.com/ViBiOh/kube@latest"
 Shell completions are available by running the following command (example is for `bash`, but it's available for `zsh`, `fish` and `powershell`).
 
 ```bash
-source <(kube completion bash)
+source <(kmux completion bash)
 ```
 
 You can also put in a dedicated file and source it from your `*sh.rc`
@@ -49,13 +49,13 @@ Because the goal of this tool is to be used on multiple clusters at once, we rel
 For running on multiple clusters at once, set a comma-separated value on the `--context` flags.
 
 ```bash
-kube --context central1,europe1,asia1 image
+kmux --context central1,europe1,asia1 image
 ```
 
 ```
 Global Flags:
       --context string      Kubernetes context, comma separated for mutiplexing commands
-  -h, --help                help for kube
+  -h, --help                help for kmux
       --kubeconfig string   Kubernetes configuration file (default "${HOME}/.kube/config")
   -n, --namespace string    Override kubernetes namespace in context
 ```
@@ -64,7 +64,7 @@ Global Flags:
 
 `log` command open a pod's watcher on a resource (Deployment, Service, CronJob, etc) by using label selector and stream every containers of every pod it finds. New pods matching the selector are automatically streamed.
 
-Each log line has a prefix of the pod's name and the container name, and also the context's name if there are multiple contexts. These kind of metadatas are written to the `stderr`, this way, if you have logs in JSON, you can pipe `kube` output into `jq` for example for extracting wanted data from logs (instead of using `grep`).
+Each log line has a prefix of the pod's name and the container name, and also the context's name if there are multiple contexts. These kind of metadatas are written to the `stderr`, this way, if you have logs in JSON, you can pipe `kmux` output into `jq` for example for extracting wanted data from logs (instead of using `grep`).
 
 The `--containers` can be set multiple times to restrict output to the given containers' name.
 
@@ -72,7 +72,7 @@ The `--containers` can be set multiple times to restrict output to the given con
 Get logs of a given resource
 
 Usage:
-  kube log <resource_type> <resource_name> [flags]
+  kmux log <resource_type> <resource_name> [flags]
 
 Aliases:
   log, logs
@@ -92,7 +92,7 @@ Flags:
 Restart pod of the given resources
 
 Usage:
-  kube restart <resource_type> <resource_name>
+  kmux restart <resource_type> <resource_name>
 ```
 
 ### `image`
@@ -103,5 +103,5 @@ Usage:
 Get image name of containers for a given resource
 
 Usage:
-  kube image <resource_type> <resource_name>
+  kmux image <resource_type> <resource_name>
 ```

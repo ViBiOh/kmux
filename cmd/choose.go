@@ -4,8 +4,8 @@ import (
 	"context"
 	"sort"
 
-	"github.com/ViBiOh/kube/pkg/client"
-	"github.com/ViBiOh/kube/pkg/resource"
+	"github.com/ViBiOh/kmux/pkg/client"
+	"github.com/ViBiOh/kmux/pkg/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

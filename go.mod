@@ -1,4 +1,4 @@
-module github.com/ViBiOh/kube
+module github.com/ViBiOh/kmux
 
 go 1.19
 
