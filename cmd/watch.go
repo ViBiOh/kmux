@@ -2,14 +2,18 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"sort"
 	"syscall"
 	"time"
 
 	"github.com/ViBiOh/kmux/pkg/client"
 	"github.com/ViBiOh/kmux/pkg/output"
 	"github.com/ViBiOh/kmux/pkg/resource"
+	"github.com/ViBiOh/kmux/pkg/sha"
 	"github.com/ViBiOh/kmux/pkg/table"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,8 +35,22 @@ var watchCmd = &cobra.Command{
 		}()
 
 		clients.Execute(func(kube client.Kube) error {
-			podChan := make(chan *v1.Pod, 4)
+			podChan := make(chan v1.Pod, 4)
 			defer close(podChan)
+
+			go watchTableOuput(kube, podChan)
+
+			pods, err := kube.CoreV1().Pods(kube.Namespace).List(ctx, metav1.ListOptions{})
+			if err != nil {
+				return err
+			}
+
+			alreadySeenPod := make(map[string]bool)
+			sort.Sort(PodByAge(pods.Items))
+			for _, pod := range pods.Items {
+				podChan <- pod
+				alreadySeenPod[shaPod(pod)] = true
+			}
 
 			watcher, err := resource.GetPodWatcher("namespace", kube.Namespace)(ctx, kube)
 			if err != nil {
@@ -41,20 +59,36 @@ var watchCmd = &cobra.Command{
 
 			defer watcher.Stop()
 
-			go watchTableOuput(kube, podChan)
-
 			for event := range watcher.ResultChan() {
 				pod, ok := event.Object.(*v1.Pod)
 				if !ok {
 					continue
 				}
 
-				podChan <- pod
+				if alreadySeenPod[shaPod(*pod)] {
+					continue
+				}
+
+				podChan <- *pod
 			}
 
 			return nil
 		})
 	},
+}
+
+// PodByAge sort v1.Pod by Age
+type PodByAge []v1.Pod
+
+func (a PodByAge) Len() int      { return len(a) }
+func (a PodByAge) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a PodByAge) Less(i, j int) bool {
+	return a[i].Status.StartTime.Before(a[j].Status.StartTime)
+}
+
+func shaPod(pod v1.Pod) string {
+	content, _ := json.Marshal(pod)
+	return sha.New(content)
 }
 
 func initWatch() {
@@ -63,7 +97,7 @@ func initWatch() {
 	flags.StringVarP(&outputFormat, "output", "o", "", "Output format. One of: (wide)")
 }
 
-func watchTableOuput(kube client.Kube, pods <-chan *v1.Pod) {
+func watchTableOuput(kube client.Kube, pods <-chan v1.Pod) {
 	defaultWidths := []uint64{
 		45, 5, 8, 6, 14,
 	}
@@ -129,9 +163,17 @@ func watchTableOuput(kube client.Kube, pods <-chan *v1.Pod) {
 			phaseCell = table.NewCellColor(phase, output.RawYellow)
 		}
 
+		var readyColor *color.Color
+		total := len(pod.Status.ContainerStatuses)
+		if ready != uint(total) {
+			readyColor = output.RawYellow
+		} else {
+			readyColor = output.RawGreen
+		}
+
 		content = append(content,
 			table.NewCell(pod.Name),
-			table.NewCell(fmt.Sprintf("%d/%d", ready, len(pod.Status.ContainerStatuses))),
+			table.NewCellColor(fmt.Sprintf("%d/%d", ready, total), readyColor),
 			phaseCell,
 			table.NewCell(since),
 			table.NewCellColor(restartText, output.RawMagenta),
@@ -152,7 +194,7 @@ func watchTableOuput(kube client.Kube, pods <-chan *v1.Pod) {
 }
 
 // from https://github.com/kubernetes/kubernetes/blob/v1.24.3/pkg/printers/internalversion/printers.go#L743
-func getPodStatus(pod *v1.Pod) (string, uint, uint, time.Time) {
+func getPodStatus(pod v1.Pod) (string, uint, uint, time.Time) {
 	var ready uint
 	var restart uint
 	lastRestartDate := metav1.NewTime(time.Time{})
@@ -255,7 +297,7 @@ func getPodStatus(pod *v1.Pod) (string, uint, uint, time.Time) {
 	return reason, ready, restart, lastRestartDate.Time
 }
 
-func getPodWide(pod *v1.Pod) (string, string, string, string) {
+func getPodWide(pod v1.Pod) (string, string, string, string) {
 	nodeName := pod.Spec.NodeName
 	nominatedNodeName := pod.Status.NominatedNodeName
 	podIP := ""
