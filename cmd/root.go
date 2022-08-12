@@ -27,7 +27,7 @@ var rootCmd = &cobra.Command{
 	Short: "Multiplexing kubectl common tasks accross clusters",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		var err error
-		clients, err = getKubernetesClient(strings.Split(viper.GetString("context"), ","))
+		clients, err = getKubernetesClient(viper.GetStringSlice("context"))
 		if err != nil {
 			output.Fatal("%s", err)
 		}
@@ -53,39 +53,53 @@ var rootCmd = &cobra.Command{
 func getKubernetesClient(contexts []string) (client.Array, error) {
 	var output client.Array
 
+	configRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: viper.GetString("kubeconfig")}
+
+	if len(contexts) == 0 {
+		contexts = append(contexts, "")
+	}
+
 	for _, context := range contexts {
-		configOverrides := &clientcmd.ConfigOverrides{
-			CurrentContext: context,
-			Context: api.Context{
-				Namespace: viper.GetString("namespace"),
-			},
-		}
-		configRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: viper.GetString("kubeconfig")}
-
-		clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(configRules, configOverrides)
-		k8sConfig, err := clientConfig.ClientConfig()
+		client, err := getClientSet(configRules, context)
 		if err != nil {
-			return nil, fmt.Errorf("read kubernetes config file: %w", err)
+			return output, err
 		}
 
-		namespace, _, err := clientConfig.Namespace()
-		if err != nil {
-			return nil, fmt.Errorf("read configured namespace: %w", err)
-		}
-
-		if allNamespace {
-			namespace = ""
-		}
-
-		clientset, err := kubernetes.NewForConfig(k8sConfig)
-		if err != nil {
-			return nil, fmt.Errorf("create kubernetes client: %w", err)
-		}
-
-		output = append(output, client.New(context, namespace, clientset))
+		output = append(output, client)
 	}
 
 	return output, nil
+}
+
+func getClientSet(configRules *clientcmd.ClientConfigLoadingRules, context string) (client.Kube, error) {
+	configOverrides := &clientcmd.ConfigOverrides{
+		CurrentContext: context,
+		Context: api.Context{
+			Namespace: viper.GetString("namespace"),
+		},
+	}
+
+	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(configRules, configOverrides)
+	k8sConfig, err := clientConfig.ClientConfig()
+	if err != nil {
+		return client.Kube{}, fmt.Errorf("read kubernetes config file: %w", err)
+	}
+
+	namespace, _, err := clientConfig.Namespace()
+	if err != nil {
+		return client.Kube{}, fmt.Errorf("read configured namespace: %w", err)
+	}
+
+	if allNamespace {
+		namespace = ""
+	}
+
+	clientset, err := kubernetes.NewForConfig(k8sConfig)
+	if err != nil {
+		return client.Kube{}, fmt.Errorf("create kubernetes client: %w", err)
+	}
+
+	return client.New(context, namespace, clientset), nil
 }
 
 func init() {
@@ -103,12 +117,31 @@ func init() {
 		output.Fatal("bind `kubeconfig` flag: %s", err)
 	}
 
-	flags.String("context", "", "Kubernetes context, comma separated for mutiplexing commands")
+	flags.StringSlice("context", nil, "Kubernetes context, multiple for mutiplexing commands")
 	if err := viper.BindPFlag("context", flags.Lookup("context")); err != nil {
 		output.Fatal("bind `context` flag: %s", err)
 	}
-	if err := viper.BindEnv("context", "KUBECONTEXT"); err != nil {
-		output.Fatal("bind env `KUBECONTEXT`: %s", err)
+
+	if err := rootCmd.RegisterFlagCompletionFunc("context", func(cmd *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+		configRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: viper.GetString("kubeconfig")}
+		config, err := configRules.Load()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+
+		contexts := viper.GetStringSlice("context")
+
+		var output []string
+		for name := range config.Contexts {
+			if contains(contexts, name) {
+				continue
+			}
+			output = append(output, name)
+		}
+
+		return output, cobra.ShellCompDirectiveNoFileComp
+	}); err != nil {
+		output.Fatal("register `context` flag completion: %s", err)
 	}
 
 	flags.BoolVarP(&allNamespace, "all-namespaces", "A", false, "Find resources in all namespaces")
@@ -142,6 +175,16 @@ func init() {
 
 	initLog()
 	rootCmd.AddCommand(logCmd)
+}
+
+func contains(arr []string, value string) bool {
+	for _, item := range arr {
+		if strings.EqualFold(item, value) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func Execute() {
