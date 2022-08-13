@@ -20,6 +20,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 )
 
+const noneValue = "<none>"
+
 var outputFormat string
 
 var watchCmd = &cobra.Command{
@@ -148,21 +150,6 @@ func watchTableOuput(kube client.Kube, pods <-chan v1.Pod) {
 			restartText = fmt.Sprintf("%-14s", fmt.Sprintf("%d (%s ago)", restart, duration.HumanDuration(time.Since(lastRestartDate))))
 		}
 
-		var phaseCell table.Cell
-
-		switch phase {
-		case string(v1.PodRunning), string(v1.PodSucceeded):
-			phaseCell = table.NewCellColor(phase, output.RawGreen)
-		case string(v1.PodFailed):
-			phaseCell = table.NewCellColor(phase, output.RawRed)
-		case string(v1.PodPending), "ContainerCreating":
-			phaseCell = table.NewCellColor(phase, output.RawCyan)
-		case "Terminating":
-			phaseCell = table.NewCellColor(phase, output.RawBlue)
-		default:
-			phaseCell = table.NewCellColor(phase, output.RawYellow)
-		}
-
 		var readyColor *color.Color
 		total := len(pod.Status.ContainerStatuses)
 		if ready != uint(total) {
@@ -174,7 +161,7 @@ func watchTableOuput(kube client.Kube, pods <-chan v1.Pod) {
 		content = append(content,
 			table.NewCell(pod.Name),
 			table.NewCellColor(fmt.Sprintf("%d/%d", ready, total), readyColor),
-			phaseCell,
+			getPhaseCell(phase),
 			table.NewCell(since),
 			table.NewCellColor(restartText, output.RawMagenta),
 		)
@@ -190,6 +177,21 @@ func watchTableOuput(kube client.Kube, pods <-chan v1.Pod) {
 		}
 
 		kube.Std(watchTable.Format(content))
+	}
+}
+
+func getPhaseCell(phase string) table.Cell {
+	switch phase {
+	case string(v1.PodRunning), string(v1.PodSucceeded):
+		return table.NewCellColor(phase, output.RawGreen)
+	case string(v1.PodFailed):
+		return table.NewCellColor(phase, output.RawRed)
+	case string(v1.PodPending), "ContainerCreating":
+		return table.NewCellColor(phase, output.RawCyan)
+	case "Terminating":
+		return table.NewCellColor(phase, output.RawBlue)
+	default:
+		return table.NewCellColor(phase, output.RawYellow)
 	}
 }
 
@@ -307,16 +309,16 @@ func getPodWide(pod v1.Pod) (string, string, string, string) {
 	}
 
 	if podIP == "" {
-		podIP = "<none>"
+		podIP = noneValue
 	}
 	if nodeName == "" {
-		nodeName = "<none>"
+		nodeName = noneValue
 	}
 	if nominatedNodeName == "" {
-		nominatedNodeName = "<none>"
+		nominatedNodeName = noneValue
 	}
 
-	readinessGates := "<none>"
+	readinessGates := noneValue
 	if len(pod.Spec.ReadinessGates) > 0 {
 		trueConditions := 0
 		for _, readinessGate := range pod.Spec.ReadinessGates {

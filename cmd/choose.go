@@ -9,6 +9,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+func getCommonNamespace(kube client.Kube, namespace string) string {
+	if len(namespace) != 0 {
+		return namespace
+	}
+
+	if !allNamespace {
+		return kube.Namespace
+	}
+
+	return ""
+}
+
 func getCommonObjects(namespace string, lister resource.Lister) []string {
 	output := make(chan string, len(clients))
 	successChan := make(chan bool, len(clients))
@@ -18,11 +30,7 @@ func getCommonObjects(namespace string, lister resource.Lister) []string {
 		defer close(successChan)
 
 		clients.Execute(func(kube client.Kube) error {
-			if len(namespace) == 0 && !allNamespace {
-				namespace = kube.Namespace
-			}
-
-			items, err := lister(context.Background(), kube, namespace, metav1.ListOptions{})
+			items, err := lister(context.Background(), kube, getCommonNamespace(kube, namespace), metav1.ListOptions{})
 			if err != nil {
 				return err
 			}
@@ -41,14 +49,19 @@ func getCommonObjects(namespace string, lister resource.Lister) []string {
 	for item := range output {
 		items = append(items, item)
 	}
-	sort.Strings(items)
 
 	var successCount uint64
 	for range successChan {
 		successCount += 1
 	}
 
-	deduplicated := items[:0]
+	return uniqueAndPresent(items, successCount)
+}
+
+func uniqueAndPresent(items []string, wantedCount uint64) []string {
+	sort.Strings(items)
+
+	unique := items[:0]
 	var count uint64
 	var previous string
 
@@ -60,10 +73,10 @@ func getCommonObjects(namespace string, lister resource.Lister) []string {
 			previous = item
 		}
 
-		if count == successCount {
-			deduplicated = append(deduplicated, previous)
+		if count == wantedCount {
+			unique = append(unique, previous)
 		}
 	}
 
-	return deduplicated
+	return unique
 }
