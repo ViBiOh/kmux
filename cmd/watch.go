@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"syscall"
@@ -22,7 +21,18 @@ import (
 
 const noneValue = "<none>"
 
+type watchPod struct {
+	v1.Pod      `json:"pod"`
+	ContextName string `json:"context_name"`
+}
+
 var outputFormat string
+
+func initWatch() {
+	flags := watchCmd.Flags()
+
+	flags.StringVarP(&outputFormat, "output", "o", "", "Output format. One of: (wide)")
+}
 
 var watchCmd = &cobra.Command{
 	Use:   "watch",
@@ -36,24 +46,10 @@ var watchCmd = &cobra.Command{
 			cancel()
 		}()
 
+		watchTable := initWatchTable()
+		initialsPodsHash := displayInitialPods(ctx, watchTable)
+
 		clients.Execute(func(kube client.Kube) error {
-			podChan := make(chan v1.Pod, 4)
-			defer close(podChan)
-
-			go watchTableOuput(kube, podChan)
-
-			pods, err := kube.CoreV1().Pods(kube.Namespace).List(ctx, metav1.ListOptions{})
-			if err != nil {
-				return err
-			}
-
-			alreadySeenPod := make(map[string]bool)
-			sort.Sort(PodByAge(pods.Items))
-			for _, pod := range pods.Items {
-				podChan <- pod
-				alreadySeenPod[shaPod(pod)] = true
-			}
-
 			watcher, err := resource.GetPodWatcher("namespace", kube.Namespace)(ctx, kube)
 			if err != nil {
 				return err
@@ -67,11 +63,11 @@ var watchCmd = &cobra.Command{
 					continue
 				}
 
-				if alreadySeenPod[shaPod(*pod)] {
+				if initialsPodsHash[sha.JSON(*pod)] {
 					continue
 				}
 
-				podChan <- *pod
+				outputWatch(watchTable, kube.Name, *pod)
 			}
 
 			return nil
@@ -79,27 +75,7 @@ var watchCmd = &cobra.Command{
 	},
 }
 
-// PodByAge sort v1.Pod by Age
-type PodByAge []v1.Pod
-
-func (a PodByAge) Len() int      { return len(a) }
-func (a PodByAge) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a PodByAge) Less(i, j int) bool {
-	return a[i].Status.StartTime.Before(a[j].Status.StartTime)
-}
-
-func shaPod(pod v1.Pod) string {
-	content, _ := json.Marshal(pod)
-	return sha.New(content)
-}
-
-func initWatch() {
-	flags := watchCmd.Flags()
-
-	flags.StringVarP(&outputFormat, "output", "o", "", "Output format. One of: (wide)")
-}
-
-func watchTableOuput(kube client.Kube, pods <-chan v1.Pod) {
+func initWatchTable() *table.Table {
 	defaultWidths := []uint64{
 		45, 5, 8, 6, 14,
 	}
@@ -111,14 +87,17 @@ func watchTableOuput(kube client.Kube, pods <-chan v1.Pod) {
 		table.NewCell("RESTARTS"),
 	}
 
-	isWide := outputFormat == "wide"
-
 	if allNamespace {
 		defaultWidths = append([]uint64{15}, defaultWidths...)
 		content = append([]table.Cell{table.NewCell("NAMESPACE")}, content...)
 	}
 
-	if isWide {
+	if len(clients) > 0 && len(clients[0].Name) != 0 {
+		defaultWidths = append([]uint64{15}, defaultWidths...)
+		content = append([]table.Cell{table.NewCell("CONTEXT")}, content...)
+	}
+
+	if outputFormat == "wide" {
 		defaultWidths = append(defaultWidths, 12, 12, 14, 15)
 		content = append(content,
 			table.NewCell("IP"),
@@ -129,55 +108,113 @@ func watchTableOuput(kube client.Kube, pods <-chan v1.Pod) {
 	}
 
 	watchTable := table.New(defaultWidths)
-	kube.Std(watchTable.Format(content))
+	output.Std("", watchTable.Format(content))
 
-	for pod := range pods {
-		content = content[:0]
+	return watchTable
+}
 
-		if allNamespace {
-			content = append(content, table.NewCell(pod.Namespace))
+func displayInitialPods(ctx context.Context, watchTable *table.Table) map[string]bool {
+	var listPods []watchPod
+	initialPods := make(chan watchPod, 4)
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		for pod := range initialPods {
+			listPods = append(listPods, pod)
+		}
+	}()
+
+	clients.Execute(func(kube client.Kube) error {
+		pods, err := kube.CoreV1().Pods(kube.Namespace).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return err
 		}
 
-		phase, ready, restart, lastRestartDate := getPodStatus(pod)
-
-		var since string
-		if pod.Status.StartTime != nil {
-			since = duration.HumanDuration(time.Since(pod.Status.StartTime.Time))
+		for _, pod := range pods.Items {
+			initialPods <- watchPod{
+				Pod:         pod,
+				ContextName: kube.Name,
+			}
 		}
 
-		var restartText string
-		if restart > 0 {
-			restartText = fmt.Sprintf("%-14s", fmt.Sprintf("%d (%s ago)", restart, duration.HumanDuration(time.Since(lastRestartDate))))
-		}
+		return nil
+	})
 
-		var readyColor *color.Color
-		total := len(pod.Status.ContainerStatuses)
-		if ready != uint(total) {
-			readyColor = output.RawYellow
-		} else {
-			readyColor = output.RawGreen
-		}
+	close(initialPods)
+	<-done
 
-		content = append(content,
-			table.NewCell(pod.Name),
-			table.NewCellColor(fmt.Sprintf("%d/%d", ready, total), readyColor),
-			getPhaseCell(phase),
-			table.NewCell(since),
-			table.NewCellColor(restartText, output.RawMagenta),
-		)
+	sort.Sort(PodByAge(listPods))
+	initialsPodsHash := make(map[string]bool)
 
-		if isWide {
-			ip, node, nominatedNode, readinessGates := getPodWide(pod)
-			content = append(content,
-				table.NewCell(ip),
-				table.NewCell(node),
-				table.NewCell(nominatedNode),
-				table.NewCell(readinessGates),
-			)
-		}
-
-		kube.Std(watchTable.Format(content))
+	for _, pod := range listPods {
+		initialsPodsHash[sha.JSON(pod.Pod)] = true
+		outputWatch(watchTable, pod.ContextName, pod.Pod)
 	}
+
+	return initialsPodsHash
+}
+
+// PodByAge sort watchPod by Age
+type PodByAge []watchPod
+
+func (a PodByAge) Len() int      { return len(a) }
+func (a PodByAge) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a PodByAge) Less(i, j int) bool {
+	return a[i].Status.StartTime.Before(a[j].Status.StartTime)
+}
+
+func outputWatch(watchTable *table.Table, contextName string, pod v1.Pod) {
+	var content []table.Cell
+
+	if len(contextName) != 0 {
+		content = append(content, table.NewCellColor(contextName, output.RawBlue))
+	}
+
+	if allNamespace {
+		content = append(content, table.NewCell(pod.Namespace))
+	}
+
+	phase, ready, restart, lastRestartDate := getPodStatus(pod)
+
+	var since string
+	if pod.Status.StartTime != nil {
+		since = duration.HumanDuration(time.Since(pod.Status.StartTime.Time))
+	}
+
+	var restartText string
+	if restart > 0 {
+		restartText = fmt.Sprintf("%-14s", fmt.Sprintf("%d (%s ago)", restart, duration.HumanDuration(time.Since(lastRestartDate))))
+	}
+
+	var readyColor *color.Color
+	total := len(pod.Status.ContainerStatuses)
+	if ready != uint(total) {
+		readyColor = output.RawYellow
+	} else {
+		readyColor = output.RawGreen
+	}
+
+	content = append(content,
+		table.NewCell(pod.Name),
+		table.NewCellColor(fmt.Sprintf("%d/%d", ready, total), readyColor),
+		getPhaseCell(phase),
+		table.NewCell(since),
+		table.NewCellColor(restartText, output.RawMagenta),
+	)
+
+	if outputFormat == "wide" {
+		ip, node, nominatedNode, readinessGates := getPodWide(pod)
+		content = append(content,
+			table.NewCell(ip),
+			table.NewCell(node),
+			table.NewCell(nominatedNode),
+			table.NewCell(readinessGates),
+		)
+	}
+
+	output.Std("", watchTable.Format(content))
 }
 
 func getPhaseCell(phase string) table.Cell {
