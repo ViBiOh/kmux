@@ -219,7 +219,7 @@ func outputWatch(watchTable *table.Table, contextName string, pod v1.Pod) {
 
 func getPhaseCell(phase string) table.Cell {
 	switch phase {
-	case string(v1.PodRunning), string(v1.PodSucceeded):
+	case string(v1.PodRunning), string(v1.PodSucceeded), "Completed":
 		return table.NewCellColor(phase, output.RawGreen)
 	case string(v1.PodFailed):
 		return table.NewCellColor(phase, output.RawRed)
