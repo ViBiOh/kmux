@@ -51,7 +51,7 @@ var rootCmd = &cobra.Command{
 }
 
 func getKubernetesClient(contexts []string) (client.Array, error) {
-	var output client.Array
+	var clientsArray client.Array
 
 	configRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: viper.GetString("kubeconfig")}
 
@@ -60,18 +60,18 @@ func getKubernetesClient(contexts []string) (client.Array, error) {
 	}
 
 	for _, context := range contexts {
-		client, err := getClientSet(configRules, context)
+		kubeClient, err := getKubeClient(configRules, context)
 		if err != nil {
-			return output, err
+			return clientsArray, err
 		}
 
-		output = append(output, client)
+		clientsArray = append(clientsArray, kubeClient)
 	}
 
-	return output, nil
+	return clientsArray, nil
 }
 
-func getClientSet(configRules *clientcmd.ClientConfigLoadingRules, context string) (client.Kube, error) {
+func getKubeClient(configRules *clientcmd.ClientConfigLoadingRules, context string) (client.Kube, error) {
 	configOverrides := &clientcmd.ConfigOverrides{
 		CurrentContext: context,
 		Context: api.Context{
@@ -147,7 +147,7 @@ func init() {
 	rootCmd.AddCommand(logCmd)
 }
 
-func completeContext(cmd *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+func completeContext(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 	configRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: viper.GetString("kubeconfig")}
 	config, err := configRules.Load()
 	if err != nil {
@@ -156,18 +156,18 @@ func completeContext(cmd *cobra.Command, _ []string, _ string) ([]string, cobra.
 
 	contexts := viper.GetStringSlice("context")
 
-	var output []string
+	var completeContexts []string
 	for name := range config.Contexts {
 		if contains(contexts, name) {
 			continue
 		}
-		output = append(output, name)
+		completeContexts = append(completeContexts, name)
 	}
 
-	return output, cobra.ShellCompDirectiveNoFileComp
+	return completeContexts, cobra.ShellCompDirectiveNoFileComp
 }
 
-func completeNamespace(cmd *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+func completeNamespace(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 	lister, err := resource.ListerFor("namespace")
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveError

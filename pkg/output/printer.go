@@ -18,10 +18,10 @@ var (
 )
 
 func init() {
-	go print()
+	go startPrinter()
 }
 
-func print() {
+func startPrinter() {
 	defer close(done)
 
 	for outputEvent := range outputChan {

@@ -63,7 +63,7 @@ Global Flags:
 
 ### `log`
 
-`log` command open a pod's watcher on a resource (Deployment, Service, CronJob, etc) by using label selector and stream every containers of every pod it finds. New pods matching the selector are automatically streamed.
+`log` command open a pod's watcher on a resource (Deployment, Service, CronJob, etc) by using label selector and stream every container of every pod it finds. New pods matching the selector are automatically streamed.
 
 Each log line has a prefix of the pod's name and the container name, and also the context's name if there are multiple contexts. These kind of metadatas are written to the `stderr`, this way, if you have logs in JSON, you can pipe `kmux` output into `jq` for example for extracting wanted data from logs (instead of using `grep`).
 
@@ -100,7 +100,7 @@ Usage:
 
 ### `restart`
 
-`restart` perform the equivalent of a rollout restart on given resource (add an annotation of the pod spec). For `job`, it's the equivalent of a replace (delete then create).
+`restart` perform the equivalent of a rollout restart on given resource (add an annotation of the pod spec). For `job`, it's the equivalent of a replacement (delete then create).
 
 ```
 Restart pod of the given resources

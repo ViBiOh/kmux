@@ -15,12 +15,10 @@ var (
 	RawCyan    = color.New(color.FgCyan)
 	RawMagenta = color.New(color.FgMagenta)
 
-	Red     = RawRed.SprintFunc()
-	Green   = RawGreen.SprintFunc()
-	Blue    = RawBlue.SprintFunc()
-	Yellow  = RawYellow.SprintFunc()
-	Cyan    = RawCyan.SprintFunc()
-	Magenta = RawMagenta.SprintFunc()
+	Red    = RawRed.SprintFunc()
+	Green  = RawGreen.SprintFunc()
+	Blue   = RawBlue.SprintFunc()
+	Yellow = RawYellow.SprintFunc()
 )
 
 func Std(prefix, format string, args ...any) {

@@ -27,17 +27,17 @@ type Action func(Kube) error
 type Array []Kube
 
 func (a Array) Execute(action Action) {
-	concurrent := concurrent.NewSimple()
+	parallel := concurrent.NewSimple()
 
 	for _, client := range a {
 		client := client
 
-		concurrent.Go(func() {
+		parallel.Go(func() {
 			if err := action(client); err != nil {
 				client.Err("%s", err)
 			}
 		})
 	}
 
-	concurrent.Wait()
+	parallel.Wait()
 }
