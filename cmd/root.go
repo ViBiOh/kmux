@@ -122,25 +122,7 @@ func init() {
 		output.Fatal("bind `context` flag: %s", err)
 	}
 
-	if err := rootCmd.RegisterFlagCompletionFunc("context", func(cmd *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
-		configRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: viper.GetString("kubeconfig")}
-		config, err := configRules.Load()
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveError
-		}
-
-		contexts := viper.GetStringSlice("context")
-
-		var output []string
-		for name := range config.Contexts {
-			if contains(contexts, name) {
-				continue
-			}
-			output = append(output, name)
-		}
-
-		return output, cobra.ShellCompDirectiveNoFileComp
-	}); err != nil {
+	if err := rootCmd.RegisterFlagCompletionFunc("context", completeContext); err != nil {
 		output.Fatal("register `context` flag completion: %s", err)
 	}
 
@@ -151,19 +133,7 @@ func init() {
 		output.Fatal("bind `namespace` flag: %s", err)
 	}
 
-	if err := rootCmd.RegisterFlagCompletionFunc("namespace", func(cmd *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
-		lister, err := resource.ListerFor("namespace")
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveError
-		}
-
-		clients, err = getKubernetesClient(strings.Split(viper.GetString("context"), ","))
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveError
-		}
-
-		return getCommonObjects("", lister), cobra.ShellCompDirectiveDefault
-	}); err != nil {
+	if err := rootCmd.RegisterFlagCompletionFunc("namespace", completeNamespace); err != nil {
 		output.Fatal("register `namespace` flag completion: %s", err)
 	}
 
@@ -175,6 +145,40 @@ func init() {
 
 	initLog()
 	rootCmd.AddCommand(logCmd)
+}
+
+func completeContext(cmd *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+	configRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: viper.GetString("kubeconfig")}
+	config, err := configRules.Load()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+
+	contexts := viper.GetStringSlice("context")
+
+	var output []string
+	for name := range config.Contexts {
+		if contains(contexts, name) {
+			continue
+		}
+		output = append(output, name)
+	}
+
+	return output, cobra.ShellCompDirectiveNoFileComp
+}
+
+func completeNamespace(cmd *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+	lister, err := resource.ListerFor("namespace")
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+
+	clients, err = getKubernetesClient(strings.Split(viper.GetString("context"), ","))
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+
+	return getCommonObjects("", lister), cobra.ShellCompDirectiveDefault
 }
 
 func contains(arr []string, value string) bool {
