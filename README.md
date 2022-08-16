@@ -22,7 +22,7 @@ curl \
   --location \
   --max-time 300 \
   --output "/usr/local/bin/kmux"
-  https://github.com/ViBiOh/kmux/releases/download/v0.0.3/kmux_$(uname -s | tr "[:upper:]" "[:lower:]")_amd64
+  https://github.com/ViBiOh/kmux/releases/download/v0.0.4/kmux_$(uname -s | tr "[:upper:]" "[:lower:]")_amd64
 chmod +x "/usr/local/bin/kmux"
 ```
 
