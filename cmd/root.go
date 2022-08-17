@@ -26,6 +26,10 @@ var rootCmd = &cobra.Command{
 	Use:   "kmux",
 	Short: "Multiplexing kubectl common tasks accross clusters",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		if parent := cmd.Parent(); parent != nil && parent.Name() == "completion" {
+			return
+		}
+
 		var err error
 		clients, err = getKubernetesClient(viper.GetStringSlice("context"))
 		if err != nil {
