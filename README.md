@@ -22,7 +22,7 @@ curl \
   --location \
   --max-time 300 \
   --output "/usr/local/bin/kmux"
-  https://github.com/ViBiOh/kmux/releases/download/v0.0.4/kmux_$(uname -s | tr "[:upper:]" "[:lower:]")_amd64
+  https://github.com/ViBiOh/kmux/releases/download/v0.0.6/kmux_$(uname -s | tr "[:upper:]" "[:lower:]")_amd64
 chmod +x "/usr/local/bin/kmux"
 ```
 
@@ -46,16 +46,16 @@ You can also put in a dedicated file and source it from your `*sh.rc`
 
 Because the goal of this tool is to be used on multiple clusters at once, we rely on high-level object name (object that templatize pods, e.g. deployments, daemonset, etc.).
 
-For running on multiple clusters at once, set a comma-separated value on the `--context` flags.
+For running on multiple clusters at once, set the `--context` flag multiple times.
 
 ```bash
-kmux --context central1,europe1,asia1 image
+kmux --context central1 --context europe1 --context asia1 image
 ```
 
 ```
 Global Flags:
   -A, --all-namespaces      Find resources in all namespaces
-      --context string      Kubernetes context, comma separated for mutiplexing commands
+      --context string      Kubernetes context, multiples values possibles
   -h, --help                help for kmux
       --kubeconfig string   Kubernetes configuration file (default "${HOME}/.kube/config")
   -n, --namespace string    Override kubernetes namespace in context
@@ -63,7 +63,7 @@ Global Flags:
 
 ### `log`
 
-`log` command open a pod's watcher on a resource (Deployment, Service, CronJob, etc) by using label selector and stream every container of every pod it finds. New pods matching the selector are automatically streamed.
+`log` command open a pod's watcher on a resource (Deployment, Service, CronJob, etc) by using label or fiels selector and stream every container of every pod it finds. New pods matching the selector are automatically streamed.
 
 Each log line has a prefix of the pod's name and the container name, and also the context's name if there are multiple contexts. These kind of metadatas are written to the `stderr`, this way, if you have logs in JSON, you can pipe `kmux` output into `jq` for example for extracting wanted data from logs (instead of using `grep`).
 
