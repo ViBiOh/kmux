@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -17,7 +18,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 )
 
@@ -84,7 +84,7 @@ var logCmd = &cobra.Command{
 
 			defer podWatcher.Stop()
 
-			activeStreams := make(map[types.UID]func())
+			var activeStreams sync.Map
 
 			streaming := concurrent.NewSimple()
 
@@ -94,14 +94,14 @@ var logCmd = &cobra.Command{
 					continue
 				}
 
-				streamCancel, ok := activeStreams[pod.UID]
+				streamCancel, ok := activeStreams.Load(pod.UID)
 
 				if event.Type == watch.Deleted || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
 					if ok {
-						streamCancel()
-						delete(activeStreams, pod.UID)
+						streamCancel.(func())()
+						activeStreams.Delete(pod.UID)
 					} else if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
-						handlePod(ctx, activeStreams, streaming, kube, pod)
+						handlePod(ctx, &activeStreams, streaming, kube, pod)
 					}
 
 					continue
@@ -111,7 +111,7 @@ var logCmd = &cobra.Command{
 					continue
 				}
 
-				handlePod(ctx, activeStreams, streaming, kube, pod)
+				handlePod(ctx, &activeStreams, streaming, kube, pod)
 			}
 
 			streaming.Wait()
@@ -129,7 +129,7 @@ func initLog() {
 	flags.BoolVarP(&dryRun, "dry-run", "d", false, "Dry-run, print only pods")
 }
 
-func handlePod(ctx context.Context, activeStreams map[types.UID]func(), streaming *concurrent.Simple, kube client.Kube, pod *v1.Pod) {
+func handlePod(ctx context.Context, activeStreams *sync.Map, streaming *concurrent.Simple, kube client.Kube, pod *v1.Pod) {
 	for _, container := range pod.Spec.Containers {
 		if !isContainerSelected(container) {
 			continue
@@ -149,7 +149,7 @@ func handlePod(ctx context.Context, activeStreams map[types.UID]func(), streamin
 			}
 
 			streamCtx, streamCancel := context.WithCancel(ctx)
-			activeStreams[pod.UID] = streamCancel
+			activeStreams.Store(pod.UID, streamCancel)
 			defer streamCancel()
 
 			streamPod(streamCtx, kube, pod.Namespace, pod.Name, container.Name)
