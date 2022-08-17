@@ -96,6 +96,20 @@ func ListerFor(resourceType string) (Lister, error) {
 
 			return output, nil
 		}, nil
+	case "po", "pod", "pods":
+		return func(ctx context.Context, kube client.Kube, namespace string, options metav1.ListOptions) ([]metav1.ObjectMeta, error) {
+			items, err := kube.CoreV1().Pods(namespace).List(ctx, options)
+			if err != nil {
+				return nil, err
+			}
+
+			output := make([]metav1.ObjectMeta, len(items.Items))
+			for i, item := range items.Items {
+				output[i] = item.ObjectMeta
+			}
+
+			return output, nil
+		}, nil
 	case "svc", "service", "services":
 		return func(ctx context.Context, kube client.Kube, namespace string, options metav1.ListOptions) ([]metav1.ObjectMeta, error) {
 			items, err := kube.CoreV1().Services(namespace).List(ctx, options)
