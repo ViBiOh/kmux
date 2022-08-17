@@ -93,7 +93,7 @@ func initWatchTable() *table.Table {
 	}
 
 	if len(clients) > 0 && len(clients[0].Name) != 0 {
-		defaultWidths = append([]uint64{15}, defaultWidths...)
+		defaultWidths = append([]uint64{uint64(len(clients[0].Name))}, defaultWidths...)
 		content = append([]table.Cell{table.NewCell("CONTEXT")}, content...)
 	}
 
