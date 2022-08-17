@@ -77,7 +77,7 @@ var watchCmd = &cobra.Command{
 
 func initWatchTable() *table.Table {
 	defaultWidths := []uint64{
-		45, 5, 8, 6, 14,
+		45, 5, 9, 6, 14,
 	}
 	content := []table.Cell{
 		table.NewCell("NAME"),
