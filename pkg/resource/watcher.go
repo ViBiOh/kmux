@@ -33,6 +33,7 @@ func GetPodWatcher(resourceType, resourceName string) PodWatcher {
 			if err != nil {
 				return nil, err
 			}
+
 			matchLabels = service.Spec.Selector
 
 		default:
@@ -60,6 +61,7 @@ func fromLabels(labels map[string]string) string {
 		if labelSelector.Len() > 0 {
 			labelSelector.WriteString(",")
 		}
+
 		labelSelector.WriteString(fmt.Sprintf("%s=%s", key, value))
 	}
 

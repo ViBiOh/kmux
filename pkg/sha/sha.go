@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-// New get sha256 value of given interface
+// New get sha256 value of given interface.
 func New(content any) string {
 	hasher := sha256.New()
 

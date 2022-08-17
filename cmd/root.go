@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -24,7 +23,7 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:   "kmux",
-	Short: "Multiplexing kubectl common tasks accross clusters",
+	Short: "Multiplexing kubectl common tasks across clusters",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		if parent := cmd.Parent(); parent != nil && parent.Name() == "completion" {
 			return
@@ -75,7 +74,7 @@ func getKubernetesClient(contexts []string) (client.Array, error) {
 	return clientsArray, nil
 }
 
-func getKubeClient(configRules *clientcmd.ClientConfigLoadingRules, context string) (client.Kube, error) {
+func getKubeClient(configRules clientcmd.ClientConfigLoader, context string) (client.Kube, error) {
 	configOverrides := &clientcmd.ConfigOverrides{
 		CurrentContext: context,
 		Context: api.Context{
@@ -84,6 +83,7 @@ func getKubeClient(configRules *clientcmd.ClientConfigLoadingRules, context stri
 	}
 
 	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(configRules, configOverrides)
+
 	k8sConfig, err := clientConfig.ClientConfig()
 	if err != nil {
 		return client.Kube{}, fmt.Errorf("read kubernetes config file: %w", err)
@@ -197,7 +197,6 @@ func contains(arr []string, value string) bool {
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		output.Fatal("%s", err)
 	}
 }

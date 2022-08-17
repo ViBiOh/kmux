@@ -26,6 +26,7 @@ func (t *Table) Format(cells []Cell) string {
 		}
 
 		var width uint64
+
 		contentWidth := uint64(len(cell.content))
 
 		if i >= len(t.widths) {

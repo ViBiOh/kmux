@@ -156,7 +156,7 @@ func displayInitialPods(ctx context.Context, watchTable *table.Table) map[string
 	return initialsPodsHash
 }
 
-// PodByAge sort watchPod by Age
+// PodByAge sort watchPod by Age.
 type PodByAge []watchPod
 
 func (a PodByAge) Len() int      { return len(a) }

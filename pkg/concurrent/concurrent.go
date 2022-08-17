@@ -4,17 +4,16 @@ import (
 	"sync"
 )
 
-// Simple describes a task group with simple parallelism
+// Simple describes a task group with simple parallelism.
 type Simple struct {
 	wg sync.WaitGroup
 }
 
-// NewSimple creates a Simple concurrent pattern
 func NewSimple() *Simple {
 	return &Simple{}
 }
 
-// Go run given function in a goroutine
+// Go run given function in a goroutine.
 func (g *Simple) Go(f func()) {
 	g.wg.Add(1)
 
@@ -25,7 +24,7 @@ func (g *Simple) Go(f func()) {
 	}()
 }
 
-// Wait for Simple to end
+// Wait for Simple to end.
 func (g *Simple) Wait() {
 	g.wg.Wait()
 }

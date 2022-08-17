@@ -52,7 +52,7 @@ func getCommonObjects(namespace string, lister resource.Lister) []string {
 
 	var successCount uint64
 	for range successChan {
-		successCount += 1
+		successCount++
 	}
 
 	return uniqueAndPresent(items, successCount)
@@ -61,13 +61,14 @@ func getCommonObjects(namespace string, lister resource.Lister) []string {
 func uniqueAndPresent(items []string, wantedCount uint64) []string {
 	sort.Strings(items)
 
-	unique := items[:0]
 	var count uint64
 	var previous string
 
+	unique := items[:0]
+
 	for _, item := range items {
 		if item == previous {
-			count += 1
+			count++
 		} else {
 			count = 1
 			previous = item
