@@ -42,6 +42,7 @@ var logCmd = &cobra.Command{
 				"namespaces",
 				"services",
 				"nodes",
+				"pods",
 			}, cobra.ShellCompDirectiveNoFileComp
 		}
 

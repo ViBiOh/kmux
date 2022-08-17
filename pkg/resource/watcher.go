@@ -36,6 +36,12 @@ func GetPodWatcher(resourceType, resourceName string) PodWatcher {
 
 			matchLabels = service.Spec.Selector
 
+		case "po", "pod", "pods":
+			return kube.CoreV1().Pods(kube.Namespace).Watch(ctx, metav1.ListOptions{
+				FieldSelector: fmt.Sprintf("metadata.name=%s", resourceName),
+				Watch:         true,
+			})
+
 		default:
 			labelSelector, err := PodSelectorGetter(ctx, kube, resourceType, resourceName)
 			if err != nil {
