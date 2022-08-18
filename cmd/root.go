@@ -138,6 +138,7 @@ func init() {
 		output.Fatal("register `namespace` flag completion: %s", err)
 	}
 
+	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(imageCmd)
 	rootCmd.AddCommand(restartCmd)
 
