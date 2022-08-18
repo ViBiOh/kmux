@@ -99,7 +99,7 @@ var logCmd = &cobra.Command{
 
 				if event.Type == watch.Deleted || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
 					if ok {
-						streamCancel.(func())()
+						streamCancel.(context.CancelFunc)()
 						activeStreams.Delete(pod.UID)
 					} else if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
 						handlePod(ctx, &activeStreams, streaming, kube, pod)
