@@ -2,8 +2,10 @@ package table
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
+	"github.com/ViBiOh/kmux/pkg/output"
 	"github.com/fatih/color"
 )
 
@@ -37,30 +39,31 @@ func (t *Table) Format(cells []Cell) string {
 			width = contentWidth
 		}
 
-		if cell.color != nil {
-			cell.color.Fprintf(&builder, fmt.Sprintf("%%-%ds", width), cell.content)
-		} else {
-			fmt.Fprintf(&builder, fmt.Sprintf("%%-%ds", width), cell.content)
+		if _, err := cell.printer(&builder, fmt.Sprintf("%%-%ds", width), cell.content); err != nil {
+			output.Err("", "printing table: %s", err)
 		}
 	}
 
 	return builder.String()
 }
 
+type Printer func(io.Writer, string, ...any) (int, error)
+
 type Cell struct {
 	content string
-	color   *color.Color
+	printer Printer
 }
 
 func NewCell(content string) Cell {
 	return Cell{
 		content: content,
+		printer: fmt.Fprintf,
 	}
 }
 
 func NewCellColor(content string, color *color.Color) Cell {
 	return Cell{
 		content: content,
-		color:   color,
+		printer: color.Fprintf,
 	}
 }
