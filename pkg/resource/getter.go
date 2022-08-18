@@ -51,7 +51,7 @@ func PodTemplateGetter(ctx context.Context, kube client.Kube, resourceType, reso
 	}
 }
 
-func PodSelectorGetter(ctx context.Context, kube client.Kube, resourceType, resourceName string) (*metav1.LabelSelector, error) {
+func PodLabelSelectorGetter(ctx context.Context, kube client.Kube, resourceType, resourceName string) (*metav1.LabelSelector, error) {
 	switch resourceType {
 	case "cronjob", "cronjobs":
 		item, err := kube.BatchV1().CronJobs(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
@@ -90,5 +90,16 @@ func PodSelectorGetter(ctx context.Context, kube client.Kube, resourceType, reso
 		return item.Spec.Selector, nil
 	default:
 		return nil, fmt.Errorf("unhandled resource type `%s`", resourceType)
+	}
+}
+
+func PodFieldSelectorGetter(ctx context.Context, resourceType, resourceName string) (string, error) {
+	switch resourceType {
+	case "po", "pod", "pods":
+		return fmt.Sprintf("metadata.name=%s", resourceName), nil
+	case "no", "node", "nodes":
+		return fmt.Sprintf("spec.nodeName=%s", resourceName), nil
+	default:
+		return "", fmt.Errorf("unhandled resource type `%s`", resourceType)
 	}
 }

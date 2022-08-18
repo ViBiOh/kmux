@@ -22,9 +22,16 @@ func GetPodWatcher(resourceType, resourceName string) PodWatcher {
 				Watch: true,
 			})
 
-		case "no", "node", "nodes":
+		case "po", "pod", "pods",
+			"no", "node", "nodes":
+
+			fieldSelector, err := PodFieldSelectorGetter(ctx, resourceType, resourceName)
+			if err != nil {
+				return nil, err
+			}
+
 			return kube.CoreV1().Pods(kube.Namespace).Watch(ctx, metav1.ListOptions{
-				FieldSelector: fmt.Sprintf("spec.nodeName=%s", resourceName),
+				FieldSelector: fieldSelector,
 				Watch:         true,
 			})
 
@@ -36,14 +43,8 @@ func GetPodWatcher(resourceType, resourceName string) PodWatcher {
 
 			matchLabels = service.Spec.Selector
 
-		case "po", "pod", "pods":
-			return kube.CoreV1().Pods(kube.Namespace).Watch(ctx, metav1.ListOptions{
-				FieldSelector: fmt.Sprintf("metadata.name=%s", resourceName),
-				Watch:         true,
-			})
-
 		default:
-			labelSelector, err := PodSelectorGetter(ctx, kube, resourceType, resourceName)
+			labelSelector, err := PodLabelSelectorGetter(ctx, kube, resourceType, resourceName)
 			if err != nil {
 				return nil, err
 			}
@@ -54,13 +55,13 @@ func GetPodWatcher(resourceType, resourceName string) PodWatcher {
 		}
 
 		return kube.CoreV1().Pods(kube.Namespace).Watch(ctx, metav1.ListOptions{
-			LabelSelector: fromLabels(matchLabels),
+			LabelSelector: fromMaps(matchLabels),
 			Watch:         true,
 		})
 	}
 }
 
-func fromLabels(labels map[string]string) string {
+func fromMaps(labels map[string]string) string {
 	var labelSelector strings.Builder
 
 	for key, value := range labels {
