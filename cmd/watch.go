@@ -221,11 +221,11 @@ func getPhaseCell(phase string) table.Cell {
 	switch phase {
 	case string(v1.PodRunning), string(v1.PodSucceeded), "Completed":
 		return table.NewCellColor(phase, output.RawGreen)
-	case string(v1.PodFailed), "Error":
+	case string(v1.PodFailed), "CrashLoopBackOff", "ImagePullBackOff", "Error":
 		return table.NewCellColor(phase, output.RawRed)
 	case string(v1.PodPending), "ContainerCreating":
 		return table.NewCellColor(phase, output.RawCyan)
-	case "Terminating":
+	case "Terminated", "Terminating":
 		return table.NewCellColor(phase, output.RawBlue)
 	default:
 		return table.NewCellColor(phase, output.RawYellow)
