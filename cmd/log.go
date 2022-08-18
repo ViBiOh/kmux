@@ -78,7 +78,7 @@ var logCmd = &cobra.Command{
 		sinceSeconds = int64(since.Seconds())
 
 		clients.Execute(func(kube client.Kube) error {
-			podWatcher, err := resource.GetPodWatcher(resourceType, resourceName)(ctx, kube)
+			podWatcher, err := resource.GetPodsWatcher(resourceType, resourceName)(ctx, kube)
 			if err != nil {
 				return err
 			}
