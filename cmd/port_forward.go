@@ -13,6 +13,7 @@ import (
 	"github.com/ViBiOh/kmux/pkg/client"
 	"github.com/ViBiOh/kmux/pkg/concurrent"
 	"github.com/ViBiOh/kmux/pkg/resource"
+	"github.com/ViBiOh/kmux/pkg/tcpool"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	v1 "k8s.io/api/core/v1"
@@ -70,6 +71,9 @@ var portForwardCmd = &cobra.Command{
 			return fmt.Errorf("invalid remote port: %s", rawRemotePort)
 		}
 
+		pool := tcpool.New()
+		go pool.Start(ctx, localPort)
+
 		go func() {
 			waitForEnd(syscall.SIGINT, syscall.SIGTERM)
 			cancel()
@@ -107,7 +111,7 @@ var portForwardCmd = &cobra.Command{
 				}
 
 				localPort += 1
-				handleForwardPod(kube, &activeForwarding, forwarding, *pod, localPort, remotePort)
+				handleForwardPod(kube, &activeForwarding, forwarding, *pod, pool, localPort, remotePort)
 			}
 
 			activeForwarding.Range(func(key, value any) bool {
@@ -120,19 +124,26 @@ var portForwardCmd = &cobra.Command{
 			return nil
 		})
 
+		<-pool.Done()
+
 		return nil
 	},
 }
 
-func handleForwardPod(kube client.Kube, activeForwarding *sync.Map, forwarding *concurrent.Simple, pod v1.Pod, localPort, remotePort uint64) {
+func handleForwardPod(kube client.Kube, activeForwarding *sync.Map, forwarding *concurrent.Simple, pod v1.Pod, pool *tcpool.Pool, localPort, remotePort uint64) {
 	stopChan := make(chan struct{})
 	activeForwarding.Store(pod.UID, stopChan)
 
 	forwarding.Go(func() {
 		defer activeForwarding.Delete(pod.UID)
 
-		kube.Info("Starting port-forward 127.0.0.1:%d => %s:%d", localPort, pod.Name, remotePort)
-		defer kube.Warn("Port-forward 127.0.0.1:%d => %s:%d ended.", localPort, pod.Name, remotePort)
+		backend := fmt.Sprintf("127.0.0.1:%d", localPort)
+
+		kube.Warn("Forwarding to %s...", pod.Name)
+		defer kube.Warn("Forwarding to %s ended.", pod.Name)
+
+		pool.Add(backend)
+		defer pool.Remove(backend)
 
 		if err := listenPortForward(kube, pod, stopChan, localPort, remotePort); err != nil {
 			kube.Err("Port-forward for %s failed: %s", pod.Name, err)
