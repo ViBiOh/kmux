@@ -25,7 +25,9 @@ func startPrinter() {
 	defer close(done)
 
 	for outputEvent := range outputChan {
-		for _, line := range strings.Split(outputEvent.message, "\n") {
+		message := strings.TrimSuffix(outputEvent.message, "\n")
+
+		for _, line := range strings.Split(message, "\n") {
 			if len(outputEvent.prefix) > 0 {
 				fmt.Fprint(os.Stderr, outputEvent.prefix)
 			}

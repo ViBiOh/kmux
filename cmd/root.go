@@ -100,7 +100,7 @@ func getKubeClient(configRules clientcmd.ClientConfigLoader, context string) (cl
 		return client.Kube{}, fmt.Errorf("create kubernetes client: %w", err)
 	}
 
-	return client.New(context, namespace, clientset), nil
+	return client.New(context, namespace, k8sConfig, clientset), nil
 }
 
 func init() {
@@ -141,6 +141,7 @@ func init() {
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(imageCmd)
 	rootCmd.AddCommand(restartCmd)
+	rootCmd.AddCommand(portForwardCmd)
 
 	initWatch()
 	rootCmd.AddCommand(watchCmd)

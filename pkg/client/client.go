@@ -4,19 +4,22 @@ import (
 	"github.com/ViBiOh/kmux/pkg/concurrent"
 	"github.com/ViBiOh/kmux/pkg/output"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 type Kube struct {
 	output.Outputter
 	*kubernetes.Clientset
+	Config    *rest.Config
 	Name      string
 	Namespace string
 }
 
-func New(name, namespace string, clientset *kubernetes.Clientset) Kube {
+func New(name, namespace string, config *rest.Config, clientset *kubernetes.Clientset) Kube {
 	return Kube{
 		Outputter: output.NewOutputter(name),
 		Clientset: clientset,
+		Config:    config,
 		Name:      name,
 		Namespace: namespace,
 	}

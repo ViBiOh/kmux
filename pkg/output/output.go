@@ -58,6 +58,11 @@ func NewOutputter(name string) Outputter {
 	}
 }
 
+func (o Outputter) Write(payload []byte) (int, error) {
+	Std(o.prefix, "%s", payload)
+	return len(payload), nil
+}
+
 func (o Outputter) Std(format string, args ...any) {
 	Std(o.prefix, format, args...)
 }

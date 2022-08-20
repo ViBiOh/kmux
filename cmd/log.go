@@ -102,7 +102,7 @@ var logCmd = &cobra.Command{
 						streamCancel.(context.CancelFunc)()
 						activeStreams.Delete(pod.UID)
 					} else if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
-						handlePod(ctx, &activeStreams, streaming, kube, pod)
+						handleLogPod(ctx, &activeStreams, streaming, kube, *pod)
 					}
 
 					continue
@@ -112,7 +112,7 @@ var logCmd = &cobra.Command{
 					continue
 				}
 
-				handlePod(ctx, &activeStreams, streaming, kube, pod)
+				handleLogPod(ctx, &activeStreams, streaming, kube, *pod)
 			}
 
 			streaming.Wait()
@@ -130,7 +130,7 @@ func initLog() {
 	flags.BoolVarP(&dryRun, "dry-run", "d", false, "Dry-run, print only pods")
 }
 
-func handlePod(ctx context.Context, activeStreams *sync.Map, streaming *concurrent.Simple, kube client.Kube, pod *v1.Pod) {
+func handleLogPod(ctx context.Context, activeStreams *sync.Map, streaming *concurrent.Simple, kube client.Kube, pod v1.Pod) {
 	for _, container := range pod.Spec.Containers {
 		if !isContainerSelected(container) {
 			continue
