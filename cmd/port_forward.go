@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/ViBiOh/kmux/pkg/client"
 	"github.com/ViBiOh/kmux/pkg/concurrent"
+	"github.com/ViBiOh/kmux/pkg/output"
 	"github.com/ViBiOh/kmux/pkg/resource"
 	"github.com/ViBiOh/kmux/pkg/tcpool"
 	"github.com/spf13/cobra"
@@ -110,8 +112,7 @@ var portForwardCmd = &cobra.Command{
 					continue
 				}
 
-				localPort += 1
-				handleForwardPod(kube, &activeForwarding, forwarding, *pod, pool, localPort, remotePort)
+				handleForwardPod(kube, &activeForwarding, forwarding, *pod, pool, remotePort)
 			}
 
 			activeForwarding.Range(func(key, value any) bool {
@@ -130,14 +131,20 @@ var portForwardCmd = &cobra.Command{
 	},
 }
 
-func handleForwardPod(kube client.Kube, activeForwarding *sync.Map, forwarding *concurrent.Simple, pod v1.Pod, pool *tcpool.Pool, localPort, remotePort uint64) {
+func handleForwardPod(kube client.Kube, activeForwarding *sync.Map, forwarding *concurrent.Simple, pod v1.Pod, pool *tcpool.Pool, remotePort uint64) {
 	stopChan := make(chan struct{})
 	activeForwarding.Store(pod.UID, stopChan)
 
 	forwarding.Go(func() {
 		defer activeForwarding.Delete(pod.UID)
 
-		backend := fmt.Sprintf("127.0.0.1:%d", localPort)
+		port, err := GetFreePort()
+		if err != nil {
+			kube.Err("get free port: %s", err)
+			return
+		}
+
+		backend := fmt.Sprintf("127.0.0.1:%d", port)
 
 		kube.Warn("Forwarding to %s...", pod.Name)
 		defer kube.Warn("Forwarding to %s ended.", pod.Name)
@@ -145,7 +152,7 @@ func handleForwardPod(kube client.Kube, activeForwarding *sync.Map, forwarding *
 		pool.Add(backend)
 		defer pool.Remove(backend)
 
-		if err := listenPortForward(kube, pod, stopChan, localPort, remotePort); err != nil {
+		if err := listenPortForward(kube, pod, stopChan, port, remotePort); err != nil {
 			kube.Err("Port-forward for %s failed: %s", pod.Name, err)
 		}
 	})
@@ -167,4 +174,22 @@ func listenPortForward(kube client.Kube, pod v1.Pod, stopChan chan struct{}, loc
 	}
 
 	return forwarder.ForwardPorts()
+}
+
+func GetFreePort() (uint64, error) {
+	addr, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
+	if err != nil {
+		return 0, err
+	}
+
+	listener, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return 0, fmt.Errorf("listen tcp: %s", err)
+	}
+
+	if closeErr := listener.Close(); closeErr != nil {
+		output.Err("", "close free port listener: %s", err)
+	}
+
+	return uint64(listener.Addr().(*net.TCPAddr).Port), nil
 }

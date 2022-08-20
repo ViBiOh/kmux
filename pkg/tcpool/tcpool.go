@@ -128,6 +128,8 @@ func (bp *Pool) Start(ctx context.Context, localPort uint64) {
 func copy(wc io.WriteCloser, r io.Reader) {
 	defer wc.Close()
 	if _, err := io.Copy(wc, r); err != nil {
-		output.Err("", "pool copy: %s", err)
+		if !strings.HasSuffix(err.Error(), "use of closed network connection") {
+			output.Err("", "pool copy: %s", err)
+		}
 	}
 }
