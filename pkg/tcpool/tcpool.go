@@ -28,14 +28,16 @@ func (bp *Pool) Done() <-chan struct{} {
 	return bp.done
 }
 
-func (bp *Pool) Add(backend string) {
+func (bp *Pool) Add(backend string) *Pool {
 	bp.Lock()
 	defer bp.Unlock()
 
 	bp.backends = append(bp.backends, backend)
+
+	return bp
 }
 
-func (bp *Pool) Remove(toRemove string) {
+func (bp *Pool) Remove(toRemove string) *Pool {
 	bp.Lock()
 	defer bp.Unlock()
 
@@ -49,6 +51,8 @@ func (bp *Pool) Remove(toRemove string) {
 	}
 
 	bp.backends = backends
+
+	return bp
 }
 
 func (bp *Pool) next() string {
@@ -60,9 +64,10 @@ func (bp *Pool) next() string {
 		return ""
 	}
 
+	next := bp.current
 	bp.current = (bp.current + 1) % backendsLen
 
-	return bp.backends[bp.current]
+	return bp.backends[next]
 }
 
 func (bp *Pool) handle(us net.Conn, server string) {
@@ -78,8 +83,7 @@ func (bp *Pool) handle(us net.Conn, server string) {
 }
 
 func (bp *Pool) Start(ctx context.Context, localPort uint64) {
-	listenerConfig := &net.ListenConfig{}
-	listener, err := listenerConfig.Listen(ctx, "tcp", fmt.Sprintf("127.0.0.1:%d", localPort))
+	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", localPort))
 	if err != nil {
 		output.Err("", "listen: %s", err)
 		return
@@ -87,19 +91,10 @@ func (bp *Pool) Start(ctx context.Context, localPort uint64) {
 
 	defer close(bp.done)
 
-	defer func() {
-		if closeErr := listener.Close(); closeErr != nil {
-			output.Err("", "listener close: %s", closeErr)
-		}
-	}()
-
 	output.Std("", "Listening tcp on %d", localPort)
 	defer output.Std("", "Listening ended.")
 
-	connChan := make(chan net.Conn, 4)
 	go func() {
-		defer close(connChan)
-
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
@@ -111,23 +106,21 @@ func (bp *Pool) Start(ctx context.Context, localPort uint64) {
 				continue
 			}
 
-			connChan <- conn
+			go bp.handle(conn, bp.next())
 		}
 	}()
 
-	for {
-		select {
-		case conn := <-connChan:
-			go bp.handle(conn, bp.next())
-		case <-ctx.Done():
-			return
-		}
+	<-ctx.Done()
+
+	if closeErr := listener.Close(); closeErr != nil {
+		output.Err("", "listener close: %s", closeErr)
 	}
 }
 
-func copy(wc io.WriteCloser, r io.Reader) {
-	defer wc.Close()
-	if _, err := io.Copy(wc, r); err != nil {
+func copy(writer io.WriteCloser, reader io.Reader) {
+	defer writer.Close()
+
+	if _, err := io.Copy(writer, reader); err != nil {
 		if !strings.HasSuffix(err.Error(), "use of closed network connection") {
 			output.Err("", "pool copy: %s", err)
 		}
