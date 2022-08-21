@@ -81,11 +81,7 @@ func TestRemove(t *testing.T) {
 func TestNext(t *testing.T) {
 	t.Parallel()
 
-	manyEdge := New().Add("localhost:4000").Add("localhost:5000")
-	manyEdge.next()
-
 	loop := New().Add("localhost:4000").Add("localhost:5000")
-	loop.next()
 	loop.next()
 
 	cases := map[string]struct {
@@ -101,7 +97,7 @@ func TestNext(t *testing.T) {
 			"localhost:4000",
 		},
 		"many item": {
-			manyEdge,
+			New().Add("localhost:4000").Add("localhost:5000"),
 			"localhost:5000",
 		},
 		"loop": {

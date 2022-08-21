@@ -99,8 +99,10 @@ var portForwardCmd = &cobra.Command{
 					continue
 				}
 
+				isContainerReady := forwardPodReady(*pod, int32(remotePort))
+
 				forwardStop, ok := activeForwarding.Load(pod.UID)
-				if event.Type == watch.Deleted || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
+				if event.Type == watch.Deleted || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed || !isContainerReady {
 					if ok {
 						close(forwardStop.(chan struct{}))
 					}
@@ -108,7 +110,7 @@ var portForwardCmd = &cobra.Command{
 					continue
 				}
 
-				if ok || pod.Status.Phase != v1.PodRunning {
+				if ok || pod.Status.Phase != v1.PodRunning || !isContainerReady {
 					continue
 				}
 
@@ -129,6 +131,38 @@ var portForwardCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func forwardPodReady(pod v1.Pod, remotePort int32) bool {
+	container, hasReadiness := getForwardContainer(pod, remotePort)
+
+	if len(container) == 0 {
+		return false
+	}
+
+	if !hasReadiness {
+		return true
+	}
+
+	for _, status := range pod.Status.ContainerStatuses {
+		if status.Name == container {
+			return status.Ready
+		}
+	}
+
+	return false
+}
+
+func getForwardContainer(pod v1.Pod, remotePort int32) (string, bool) {
+	for _, container := range pod.Spec.Containers {
+		for _, port := range container.Ports {
+			if port.ContainerPort == remotePort {
+				return container.Name, container.ReadinessProbe != nil
+			}
+		}
+	}
+
+	return "", false
 }
 
 func handleForwardPod(kube client.Kube, activeForwarding *sync.Map, forwarding *concurrent.Simple, pod v1.Pod, pool *tcpool.Pool, remotePort uint64) {

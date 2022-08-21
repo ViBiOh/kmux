@@ -64,10 +64,9 @@ func (bp *Pool) next() string {
 		return ""
 	}
 
-	next := bp.current
 	bp.current = (bp.current + 1) % backendsLen
 
-	return bp.backends[next]
+	return bp.backends[bp.current]
 }
 
 func (bp *Pool) handle(us net.Conn, server string) {
