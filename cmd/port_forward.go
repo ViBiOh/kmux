@@ -25,8 +25,9 @@ import (
 )
 
 var portForwardCmd = &cobra.Command{
-	Use:   "port-forward <resource_type> <resource_name> <local_port> <remote_port numeric or by name>",
-	Short: "Port forward to a ressources",
+	Use:     "port-forward <resource_type> <resource_name> <local_port> <remote_port numeric or by name>",
+	Aliases: []string{"forward"},
+	Short:   "Port forward to pods of a resource",
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
 			return []string{

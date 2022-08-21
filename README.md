@@ -85,6 +85,19 @@ Flags:
   -s, --since duration       Display logs since given duration (default 1h0m0s)
 ```
 
+### `port-forward`
+
+Like `log`, `port-forward` command open a pod's watcher on a resource and port-forward to every container matching port and being ready. New pods matching the selector are automatically streamed.
+
+A local tcp load-balancer is started on given `local port` that will forward to underlying pods by using round-robin algorithm.
+
+```
+Port forward to pods of a resource
+
+Usage:
+  kmux port-forward <resource_type> <resource_name> <local_port> <remote_port numeric or by name> [flags]
+```
+
 ### `watch`
 
 `watch` for all pods in a given namespace (or all namespaces). Status phase is done in a nearly same way that the official `kubectl` (computing the status of a Pod is not that easy).
