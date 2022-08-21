@@ -25,7 +25,7 @@ import (
 )
 
 var portForwardCmd = &cobra.Command{
-	Use:   "port-forward <resource_type> <resource_name> <local_port> <remote_port>",
+	Use:   "port-forward <resource_type> <resource_name> <local_port> <remote_port numeric or by name>",
 	Short: "Port forward to a ressources",
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
@@ -68,11 +68,6 @@ var portForwardCmd = &cobra.Command{
 			return fmt.Errorf("invalid local port: %s", rawLocalPort)
 		}
 
-		remotePort, err := strconv.ParseUint(rawRemotePort, 10, 32)
-		if err != nil {
-			return fmt.Errorf("invalid remote port: %s", rawRemotePort)
-		}
-
 		pool := tcpool.New()
 		go pool.Start(ctx, localPort)
 
@@ -99,7 +94,13 @@ var portForwardCmd = &cobra.Command{
 					continue
 				}
 
-				isContainerReady := forwardPodReady(*pod, int32(remotePort))
+				remotePort := getForwardPort(pod, rawRemotePort)
+				if remotePort == 0 {
+					kube.Err("port `%s` not found", rawRemotePort)
+					continue
+				}
+
+				isContainerReady := isForwardPodReady(pod, int32(remotePort))
 
 				forwardStop, ok := activeForwarding.Load(pod.UID)
 				if event.Type == watch.Deleted || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed || !isContainerReady {
@@ -133,7 +134,24 @@ var portForwardCmd = &cobra.Command{
 	},
 }
 
-func forwardPodReady(pod v1.Pod, remotePort int32) bool {
+func getForwardPort(pod *v1.Pod, remotePort string) int32 {
+	numericPort, err := strconv.ParseUint(remotePort, 10, 32)
+	if err == nil {
+		return int32(numericPort)
+	}
+
+	for _, container := range pod.Spec.Containers {
+		for _, port := range container.Ports {
+			if port.Name == remotePort {
+				return port.ContainerPort
+			}
+		}
+	}
+
+	return 0
+}
+
+func isForwardPodReady(pod *v1.Pod, remotePort int32) bool {
 	container, hasReadiness := getForwardContainer(pod, remotePort)
 
 	if len(container) == 0 {
@@ -153,7 +171,7 @@ func forwardPodReady(pod v1.Pod, remotePort int32) bool {
 	return false
 }
 
-func getForwardContainer(pod v1.Pod, remotePort int32) (string, bool) {
+func getForwardContainer(pod *v1.Pod, remotePort int32) (string, bool) {
 	for _, container := range pod.Spec.Containers {
 		for _, port := range container.Ports {
 			if port.ContainerPort == remotePort {
@@ -165,7 +183,7 @@ func getForwardContainer(pod v1.Pod, remotePort int32) (string, bool) {
 	return "", false
 }
 
-func handleForwardPod(kube client.Kube, activeForwarding *sync.Map, forwarding *concurrent.Simple, pod v1.Pod, pool *tcpool.Pool, remotePort uint64) {
+func handleForwardPod(kube client.Kube, activeForwarding *sync.Map, forwarding *concurrent.Simple, pod v1.Pod, pool *tcpool.Pool, remotePort int32) {
 	stopChan := make(chan struct{})
 	activeForwarding.Store(pod.UID, stopChan)
 
@@ -192,7 +210,7 @@ func handleForwardPod(kube client.Kube, activeForwarding *sync.Map, forwarding *
 	})
 }
 
-func listenPortForward(kube client.Kube, pod v1.Pod, stopChan chan struct{}, localPort, podPort uint64) error {
+func listenPortForward(kube client.Kube, pod v1.Pod, stopChan chan struct{}, localPort, podPort int32) error {
 	path := fmt.Sprintf("/api/v1/namespaces/%s/pods/%s/portforward", pod.Namespace, pod.Name)
 	hostIP := strings.TrimPrefix(kube.Config.Host, "https://")
 
@@ -210,7 +228,7 @@ func listenPortForward(kube client.Kube, pod v1.Pod, stopChan chan struct{}, loc
 	return forwarder.ForwardPorts()
 }
 
-func GetFreePort() (uint64, error) {
+func GetFreePort() (int32, error) {
 	addr, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
 	if err != nil {
 		return 0, err
@@ -225,5 +243,5 @@ func GetFreePort() (uint64, error) {
 		output.Err("", "close free port listener: %s", err)
 	}
 
-	return uint64(listener.Addr().(*net.TCPAddr).Port), nil
+	return int32(listener.Addr().(*net.TCPAddr).Port), nil
 }
