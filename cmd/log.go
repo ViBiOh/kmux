@@ -29,7 +29,7 @@ var (
 )
 
 var logCmd = &cobra.Command{
-	Use:     "log <resource_type> <resource_name>",
+	Use:     "log TYPE NAME",
 	Aliases: []string{"logs"},
 	Short:   "Get logs of a given resource",
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

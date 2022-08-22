@@ -19,13 +19,14 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
 )
 
 var portForwardCmd = &cobra.Command{
-	Use:     "port-forward <resource_type> <resource_name> <local_port> <remote_port numeric or by name>",
+	Use:     "port-forward TYPE NAME [local_port:]remote_port",
 	Aliases: []string{"forward"},
 	Short:   "Port forward to pods of a resource",
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -34,6 +35,7 @@ var portForwardCmd = &cobra.Command{
 				"daemonsets",
 				"deployments",
 				"pods",
+				"services",
 				"statefulsets",
 			}, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -54,20 +56,28 @@ var portForwardCmd = &cobra.Command{
 
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
-	Args: cobra.ExactValidArgs(4),
+	Args: cobra.ExactValidArgs(3),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		resourceType := args[0]
 		resourceName := args[1]
-		rawLocalPort := args[2]
-		rawRemotePort := args[3]
+		rawPort := args[2]
+
+		ports := strings.SplitN(rawPort, ":", 2)
+
+		localPort, err := strconv.ParseUint(ports[0], 10, 32)
+		if err != nil {
+			return fmt.Errorf("invalid local port: %s", ports[0])
+		}
+
+		var remotePort string
+		if len(ports) == 2 {
+			remotePort = ports[1]
+		} else {
+			remotePort = ports[0]
+		}
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-
-		localPort, err := strconv.ParseUint(rawLocalPort, 10, 32)
-		if err != nil {
-			return fmt.Errorf("invalid local port: %s", rawLocalPort)
-		}
 
 		pool := tcpool.New()
 		go pool.Start(ctx, localPort)
@@ -78,6 +88,17 @@ var portForwardCmd = &cobra.Command{
 		}()
 
 		clients.Execute(func(kube client.Kube) error {
+			remotePort := remotePort
+
+			if resource.IsService(resourceType) {
+				var err error
+
+				remotePort, err = getTargetPort(ctx, kube, resourceName, remotePort)
+				if err != nil {
+					kube.Err("get target port: %s", err)
+				}
+			}
+
 			podWatcher, err := resource.WatchPods(ctx, kube, resourceType, resourceName, dryRun)
 			if err != nil {
 				return err
@@ -95,9 +116,9 @@ var portForwardCmd = &cobra.Command{
 					continue
 				}
 
-				remotePort := getForwardPort(pod, rawRemotePort)
+				remotePort := getForwardPort(pod, remotePort)
 				if remotePort == 0 {
-					kube.Err("port `%s` not found", rawRemotePort)
+					kube.Err("port `%d` not found", remotePort)
 					continue
 				}
 
@@ -133,6 +154,21 @@ var portForwardCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func getTargetPort(ctx context.Context, kube client.Kube, name, port string) (string, error) {
+	service, err := kube.CoreV1().Services(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("get service: %w", err)
+	}
+
+	for _, servicePort := range service.Spec.Ports {
+		if servicePort.Name == port || string(servicePort.Port) == port {
+			return string(servicePort.TargetPort.StrVal), nil
+		}
+	}
+
+	return port, nil
 }
 
 func getForwardPort(pod *v1.Pod, remotePort string) int32 {
@@ -199,7 +235,7 @@ func handleForwardPod(kube client.Kube, activeForwarding *sync.Map, forwarding *
 
 		backend := fmt.Sprintf("127.0.0.1:%d", port)
 
-		kube.Warn("Forwarding to %s...", pod.Name)
+		kube.Std("Forwarding to %s to %s...", output.Blue(backend), output.Green(fmt.Sprintf("%s:%d", pod.Name, remotePort)))
 		defer kube.Warn("Forwarding to %s ended.", pod.Name)
 
 		pool.Add(backend)

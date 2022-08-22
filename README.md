@@ -73,7 +73,7 @@ The `--containers` can be set multiple times to restrict output to the given con
 Get logs of a given resource
 
 Usage:
-  kmux log <resource_type> <resource_name> [flags]
+  kmux log TYPE NAME [flags]
 
 Aliases:
   log, logs
@@ -95,7 +95,7 @@ A local tcp load-balancer is started on given `local port` that will forward to 
 Port forward to pods of a resource
 
 Usage:
-  kmux port-forward <resource_type> <resource_name> <local_port> <remote_port numeric or by name> [flags]
+  kmux port-forward TYPE NAME <local_port> <remote_port numeric or by name> [flags]
 ```
 
 ### `watch`
@@ -119,7 +119,7 @@ Usage:
 Restart pod of the given resources
 
 Usage:
-  kmux restart <resource_type> <resource_name>
+  kmux restart TYPE NAME
 ```
 
 ### `image`
@@ -130,5 +130,5 @@ Usage:
 Get image name of containers for a given resource
 
 Usage:
-  kmux image <resource_type> <resource_name>
+  kmux image TYPE NAME
 ```

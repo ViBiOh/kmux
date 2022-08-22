@@ -27,7 +27,7 @@ type restartPatch struct {
 }
 
 var restartCmd = &cobra.Command{
-	Use:   "restart <resource_type> <resource_name>",
+	Use:   "restart TYPE NAME",
 	Short: "Restart pod of the given resources",
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
