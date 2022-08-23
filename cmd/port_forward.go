@@ -235,7 +235,7 @@ func handleForwardPod(kube client.Kube, activeForwarding *sync.Map, forwarding *
 
 		backend := fmt.Sprintf("127.0.0.1:%d", port)
 
-		kube.Std("Forwarding to %s to %s...", output.Blue(backend), output.Green(fmt.Sprintf("%s:%d", pod.Name, remotePort)))
+		kube.Std("Forwarding from %s to %s...", output.Blue(backend), output.Green(fmt.Sprintf("%s:%d", pod.Name, remotePort)))
 		defer kube.Warn("Forwarding to %s ended.", pod.Name)
 
 		pool.Add(backend)
