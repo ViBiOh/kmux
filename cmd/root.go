@@ -141,6 +141,8 @@ func init() {
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(imageCmd)
 	rootCmd.AddCommand(restartCmd)
+
+	initPortForward()
 	rootCmd.AddCommand(portForwardCmd)
 
 	initWatch()

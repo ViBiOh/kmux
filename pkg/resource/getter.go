@@ -48,7 +48,7 @@ func PodTemplateGetter(ctx context.Context, kube client.Kube, resourceType, reso
 
 		return item.Spec.Template, nil
 	default:
-		return v1.PodTemplateSpec{}, fmt.Errorf("unhandled resource type `%s`", resourceType)
+		return v1.PodTemplateSpec{}, unhandledError(resourceType)
 	}
 }
 
@@ -154,7 +154,7 @@ func PodLabelSelectorGetter(ctx context.Context, kube client.Kube, resourceType,
 
 		return item.Spec.Selector, nil
 	default:
-		return nil, fmt.Errorf("unhandled resource type `%s`", resourceType)
+		return nil, unhandledError(resourceType)
 	}
 }
 
@@ -165,6 +165,10 @@ func PodFieldSelectorGetter(ctx context.Context, resourceType, resourceName stri
 	case "no", "node", "nodes":
 		return fmt.Sprintf("spec.nodeName=%s", resourceName), nil
 	default:
-		return "", fmt.Errorf("unhandled resource type `%s`", resourceType)
+		return "", unhandledError(resourceType)
 	}
+}
+
+func unhandledError(resourceType string) error {
+	return fmt.Errorf("unhandled resource type `%s`", resourceType)
 }

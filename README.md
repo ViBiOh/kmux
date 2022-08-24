@@ -81,7 +81,6 @@ Aliases:
 Flags:
   -c, --containers strings   Filter container's name, default to all containers
   -d, --dry-run              Dry-run, print only pods
-  -h, --help                 help for log
   -s, --since duration       Display logs since given duration (default 1h0m0s)
 ```
 
@@ -95,7 +94,13 @@ A local tcp load-balancer is started on given `local port` that will forward to 
 Port forward to pods of a resource
 
 Usage:
-  kmux port-forward TYPE NAME <local_port> <remote_port numeric or by name> [flags]
+  kmux port-forward TYPE NAME [local_port:]remote_port [flags]
+
+Aliases:
+  port-forward, forward
+
+Flags:
+  -d, --dry-run   Dry-run, print only pods
 ```
 
 ### `watch`
@@ -108,7 +113,10 @@ Output is colored according to the current status of the pod, for better clarity
 Get all pods in the namespace
 
 Usage:
-  kmux watch
+  kmux watch [flags]
+
+Flags:
+  -o, --output string   Output format. One of: (wide)
 ```
 
 ### `restart`
@@ -119,7 +127,7 @@ Usage:
 Restart pod of the given resources
 
 Usage:
-  kmux restart TYPE NAME
+  kmux restart TYPE NAME [flags]
 ```
 
 ### `image`
@@ -127,8 +135,8 @@ Usage:
 `image` prints the image name of all containers found in given resource. The idea is to check that every cluster runs the same version.
 
 ```
-Get image name of containers for a given resource
+Get all image names of containers for a given resource
 
 Usage:
-  kmux image TYPE NAME
+  kmux image TYPE NAME [flags]
 ```

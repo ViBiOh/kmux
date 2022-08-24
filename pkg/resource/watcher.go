@@ -12,6 +12,7 @@ type DryWatcher struct {
 }
 
 func (dw DryWatcher) Stop() {
+	// Nothing to stop
 }
 
 func (dw DryWatcher) ResultChan() <-chan watch.Event {

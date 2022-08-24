@@ -19,9 +19,7 @@ type Pool struct {
 }
 
 func New() *Pool {
-	return &Pool{
-		done: make(chan struct{}),
-	}
+	return &Pool{}
 }
 
 func (bp *Pool) Done() <-chan struct{} {
@@ -88,10 +86,8 @@ func (bp *Pool) Start(ctx context.Context, localPort uint64) {
 		return
 	}
 
+	bp.done = make(chan struct{})
 	defer close(bp.done)
-
-	output.Std("", "Listening tcp on %d", localPort)
-	defer output.Std("", "Listening ended.")
 
 	go func() {
 		for {

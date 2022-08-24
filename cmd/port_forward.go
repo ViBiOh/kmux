@@ -79,8 +79,13 @@ var portForwardCmd = &cobra.Command{
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		pool := tcpool.New()
-		go pool.Start(ctx, localPort)
+		output.Std("", "Listening tcp on %d", localPort)
+
+		var pool *tcpool.Pool
+		if !dryRun {
+			pool = tcpool.New()
+			go pool.Start(ctx, localPort)
+		}
 
 		go func() {
 			waitForEnd(syscall.SIGINT, syscall.SIGTERM)
@@ -150,10 +155,18 @@ var portForwardCmd = &cobra.Command{
 			return nil
 		})
 
-		<-pool.Done()
+		if pool != nil {
+			<-pool.Done()
+		}
 
 		return nil
 	},
+}
+
+func initPortForward() {
+	flags := portForwardCmd.Flags()
+
+	flags.BoolVarP(&dryRun, "dry-run", "d", false, "Dry-run, print only pods")
 }
 
 func getTargetPort(ctx context.Context, kube client.Kube, name, port string) (string, error) {
@@ -236,6 +249,10 @@ func handleForwardPod(kube client.Kube, activeForwarding *sync.Map, forwarding *
 		backend := fmt.Sprintf("127.0.0.1:%d", port)
 
 		kube.Std("Forwarding from %s to %s...", output.Blue(backend), output.Green(fmt.Sprintf("%s:%d", pod.Name, remotePort)))
+		if dryRun {
+			return
+		}
+
 		defer kube.Warn("Forwarding to %s ended.", pod.Name)
 
 		pool.Add(backend)
@@ -259,7 +276,7 @@ func listenPortForward(kube client.Kube, pod v1.Pod, stopChan chan struct{}, loc
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, http.MethodPost, &url.URL{Scheme: "https", Path: path, Host: hostIP})
 	forwarder, err := portforward.New(dialer, []string{fmt.Sprintf("%d:%d", localPort, podPort)}, stopChan, nil, nil, kube.Outputter)
 	if err != nil {
-		return fmt.Errorf("dial: %w", err)
+		return err
 	}
 
 	return forwarder.ForwardPorts()
