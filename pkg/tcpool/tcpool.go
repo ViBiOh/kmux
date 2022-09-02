@@ -80,14 +80,14 @@ func (bp *Pool) handle(us net.Conn, server string) {
 }
 
 func (bp *Pool) Start(ctx context.Context, localPort uint64) {
+	bp.done = make(chan struct{})
+	defer close(bp.done)
+
 	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", localPort))
 	if err != nil {
 		output.Err("", "listen: %s", err)
 		return
 	}
-
-	bp.done = make(chan struct{})
-	defer close(bp.done)
 
 	go func() {
 		for {
