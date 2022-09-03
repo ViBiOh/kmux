@@ -12,10 +12,10 @@ import (
 )
 
 type Pool struct {
-	sync.RWMutex
+	done     chan struct{}
 	backends []string
 	current  uint64
-	done     chan struct{}
+	sync.RWMutex
 }
 
 func New() *Pool {

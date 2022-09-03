@@ -22,8 +22,8 @@ import (
 const noneValue = "<none>"
 
 type watchPod struct {
-	v1.Pod      `json:"pod"`
 	ContextName string `json:"context_name"`
+	v1.Pod      `json:"pod"`
 }
 
 var outputFormat string

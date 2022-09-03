@@ -50,8 +50,8 @@ func (t *Table) Format(cells []Cell) string {
 type Printer func(io.Writer, string, ...any) (int, error)
 
 type Cell struct {
-	content string
 	printer Printer
+	content string
 }
 
 func NewCell(content string) Cell {
