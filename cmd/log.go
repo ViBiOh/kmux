@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -26,6 +27,9 @@ var (
 	since        time.Duration
 	sinceSeconds int64
 	containers   []string
+
+	containersName   []string
+	containersRegexp []*regexp.Regexp
 )
 
 var logCmd = &cobra.Command{
@@ -77,6 +81,15 @@ var logCmd = &cobra.Command{
 
 		sinceSeconds = int64(since.Seconds())
 
+		for _, container := range containers {
+			re, err := regexp.Compile(container)
+			if err == nil {
+				containersRegexp = append(containersRegexp, re)
+			} else {
+				containersName = append(containersName, container)
+			}
+		}
+
 		clients.Execute(func(kube client.Kube) error {
 			podWatcher, err := resource.WatchPods(ctx, kube, resourceType, resourceName, dryRun)
 			if err != nil {
@@ -126,7 +139,7 @@ func initLog() {
 	flags := logCmd.Flags()
 
 	flags.DurationVarP(&since, "since", "s", time.Hour, "Display logs since given duration")
-	flags.StringSliceVarP(&containers, "containers", "c", nil, "Filter container's name, default to all containers")
+	flags.StringSliceVarP(&containers, "containers", "c", nil, "Filter container's name, default to all containers, supports regexp")
 	flags.BoolVarP(&dryRun, "dry-run", "d", false, "Dry-run, print only pods")
 }
 
@@ -210,7 +223,13 @@ func isContainerSelected(container v1.Container) bool {
 		return true
 	}
 
-	for _, containerName := range containers {
+	for _, containerRegexp := range containersRegexp {
+		if containerRegexp.MatchString(container.Name) {
+			return true
+		}
+	}
+
+	for _, containerName := range containersName {
 		if strings.EqualFold(containerName, container.Name) {
 			return true
 		}
