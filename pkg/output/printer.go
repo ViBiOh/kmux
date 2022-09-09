@@ -51,5 +51,10 @@ func Done() <-chan struct{} {
 }
 
 func outputContent(std bool, prefix, format string, args ...any) {
-	outputChan <- event{std: std, prefix: prefix, message: fmt.Sprintf(format, args...)}
+	message := format
+	if len(args) > 0 {
+		message = fmt.Sprintf(format, args...)
+	}
+
+	outputChan <- event{std: std, prefix: prefix, message: message}
 }
