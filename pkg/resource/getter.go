@@ -97,12 +97,12 @@ func PodsGetterConfiguration(ctx context.Context, kube client.Kube, resourceType
 	}
 
 	namespace = kube.Namespace
-	options.LabelSelector = fromMaps(matchLabels)
+	options.LabelSelector = LabelSelectorFromMaps(matchLabels)
 
 	return
 }
 
-func fromMaps(labels map[string]string) string {
+func LabelSelectorFromMaps(labels map[string]string) string {
 	var labelSelector strings.Builder
 
 	for key, value := range labels {

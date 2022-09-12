@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ViBiOh/kmux/pkg/client"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 )
 
@@ -19,23 +20,18 @@ func (dw DryWatcher) ResultChan() <-chan watch.Event {
 	return dw.pods
 }
 
-func WatchPods(ctx context.Context, kube client.Kube, resourceType, resourceName string, dryRun bool) (watch.Interface, error) {
+func WatchPods(ctx context.Context, kube client.Kube, namespace string, options metav1.ListOptions, dryRun bool) (watch.Interface, error) {
 	if dryRun {
-		return watchPodsDry(ctx, kube, resourceType, resourceName)
+		return watchPodsDry(ctx, kube, namespace, options)
 	}
 
-	namespace, listOptions, err := PodsGetterConfiguration(ctx, kube, resourceType, resourceName)
-	if err != nil {
-		return nil, err
-	}
+	options.Watch = true
 
-	listOptions.Watch = true
-
-	return kube.CoreV1().Pods(namespace).Watch(ctx, listOptions)
+	return kube.CoreV1().Pods(namespace).Watch(ctx, options)
 }
 
-func watchPodsDry(ctx context.Context, kube client.Kube, resourceType, resourceName string) (watch.Interface, error) {
-	pods, err := ListPods(ctx, kube, resourceType, resourceName)
+func watchPodsDry(ctx context.Context, kube client.Kube, namespace string, options metav1.ListOptions) (watch.Interface, error) {
+	pods, err := kube.CoreV1().Pods(namespace).List(ctx, options)
 	if err != nil {
 		return nil, err
 	}

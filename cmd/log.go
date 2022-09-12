@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"regexp"
@@ -19,6 +20,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 )
 
@@ -27,6 +29,7 @@ var (
 	since        time.Duration
 	sinceSeconds int64
 	containers   []string
+	labels       map[string]string
 
 	containersName   []string
 	containersRegexp []*regexp.Regexp
@@ -44,9 +47,9 @@ var logCmd = &cobra.Command{
 				"deployments",
 				"jobs",
 				"namespaces",
-				"services",
 				"nodes",
 				"pods",
+				"services",
 			}, cobra.ShellCompDirectiveNoFileComp
 		}
 
@@ -66,10 +69,10 @@ var logCmd = &cobra.Command{
 
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
-	Args: cobra.ExactValidArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
-		resourceType := args[0]
-		resourceName := args[1]
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) != 2 && len(labels) == 0 {
+			return errors.New("either labels or `TYPE NAME` args must be specified")
+		}
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -91,7 +94,29 @@ var logCmd = &cobra.Command{
 		}
 
 		clients.Execute(func(kube client.Kube) error {
-			podWatcher, err := resource.WatchPods(ctx, kube, resourceType, resourceName, dryRun)
+			var listOptions metav1.ListOptions
+
+			namespace := kube.Namespace
+
+			if len(args) > 1 {
+				var err error
+
+				namespace, listOptions, err = resource.PodsGetterConfiguration(ctx, kube, args[0], args[1])
+				if err != nil {
+					return err
+				}
+			}
+
+			if len(labels) > 0 {
+				labelSelector := resource.LabelSelectorFromMaps(labels)
+				if len(listOptions.LabelSelector) > 0 {
+					listOptions.LabelSelector += ","
+				}
+
+				listOptions.LabelSelector += labelSelector
+			}
+
+			podWatcher, err := resource.WatchPods(ctx, kube, namespace, listOptions, dryRun)
 			if err != nil {
 				return err
 			}
@@ -132,6 +157,8 @@ var logCmd = &cobra.Command{
 
 			return nil
 		})
+
+		return nil
 	},
 }
 
@@ -141,6 +168,8 @@ func initLog() {
 	flags.DurationVarP(&since, "since", "s", time.Hour, "Display logs since given duration")
 	flags.StringSliceVarP(&containers, "containers", "c", nil, "Filter container's name, default to all containers, supports regexp")
 	flags.BoolVarP(&dryRun, "dry-run", "d", false, "Dry-run, print only pods")
+
+	flags.StringToStringVarP(&labels, "labels", "l", nil, "Labels to filter pods")
 }
 
 func handleLogPod(ctx context.Context, activeStreams *sync.Map, streaming *concurrent.Simple, kube client.Kube, pod v1.Pod) {

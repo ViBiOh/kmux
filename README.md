@@ -79,9 +79,11 @@ Aliases:
   log, logs
 
 Flags:
-  -c, --containers strings   Filter container's name, default to all containers, supports regexp
-  -d, --dry-run              Dry-run, print only pods
-  -s, --since duration       Display logs since given duration (default 1h0m0s)
+  -c, --containers strings      Filter container's name, default to all containers, supports regexp
+  -d, --dry-run                 Dry-run, print only pods
+  -h, --help                    help for log
+  -l, --labels stringToString   Labels to filter pods (default [])
+  -s, --since duration          Display logs since given duration (default 1h0m0s)
 ```
 
 ### `port-forward`
