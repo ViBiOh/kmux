@@ -169,7 +169,7 @@ func initLog() {
 	flags.StringSliceVarP(&containers, "containers", "c", nil, "Filter container's name, default to all containers, supports regexp")
 	flags.BoolVarP(&dryRun, "dry-run", "d", false, "Dry-run, print only pods")
 
-	flags.StringToStringVarP(&labels, "labels", "l", nil, "Labels to filter pods")
+	flags.StringToStringVarP(&labels, "selector", "l", nil, "Labels to filter pods")
 }
 
 func handleLogPod(ctx context.Context, activeStreams *sync.Map, streaming *concurrent.Simple, kube client.Kube, pod v1.Pod) {
