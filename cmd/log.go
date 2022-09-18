@@ -95,13 +95,14 @@ var logCmd = &cobra.Command{
 
 		clients.Execute(func(kube client.Kube) error {
 			var listOptions metav1.ListOptions
+			var postListFilter resource.PodFilter
 
 			namespace := kube.Namespace
 
 			if len(args) > 1 {
 				var err error
 
-				namespace, listOptions, err = resource.PodsGetterConfiguration(ctx, kube, args[0], args[1])
+				namespace, listOptions, postListFilter, err = resource.PodsGetterConfiguration(ctx, kube, args[0], args[1])
 				if err != nil {
 					return err
 				}
@@ -116,7 +117,7 @@ var logCmd = &cobra.Command{
 				listOptions.LabelSelector += labelSelector
 			}
 
-			podWatcher, err := resource.WatchPods(ctx, kube, namespace, listOptions, dryRun)
+			podWatcher, err := resource.WatchPods(ctx, kube, namespace, listOptions, postListFilter, dryRun)
 			if err != nil {
 				return err
 			}

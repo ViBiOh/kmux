@@ -50,12 +50,12 @@ var watchCmd = &cobra.Command{
 		initialsPodsHash := displayInitialPods(ctx, watchTable)
 
 		clients.Execute(func(kube client.Kube) error {
-			namespace, listOptions, err := resource.PodsGetterConfiguration(ctx, kube, "namespace", kube.Namespace)
+			namespace, listOptions, postListFilter, err := resource.PodsGetterConfiguration(ctx, kube, "namespace", kube.Namespace)
 			if err != nil {
 				return err
 			}
 
-			watcher, err := resource.WatchPods(ctx, kube, namespace, listOptions, false)
+			watcher, err := resource.WatchPods(ctx, kube, namespace, listOptions, postListFilter, false)
 			if err != nil {
 				return err
 			}

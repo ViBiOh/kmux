@@ -6,9 +6,12 @@ import (
 	"strings"
 
 	"github.com/ViBiOh/kmux/pkg/client"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+type PodFilter func(context.Context, client.Kube, v1.Pod) bool
 
 func PodTemplateGetter(ctx context.Context, kube client.Kube, resourceType, resourceName string) (v1.PodTemplateSpec, error) {
 	switch resourceType {
@@ -52,27 +55,18 @@ func PodTemplateGetter(ctx context.Context, kube client.Kube, resourceType, reso
 	}
 }
 
-func ListPods(ctx context.Context, kube client.Kube, resourceType, resourceName string) (*v1.PodList, error) {
-	namespace, listOptions, err := PodsGetterConfiguration(ctx, kube, resourceType, resourceName)
-	if err != nil {
-		return nil, err
-	}
-
-	return kube.CoreV1().Pods(namespace).List(ctx, listOptions)
-}
-
-func PodsGetterConfiguration(ctx context.Context, kube client.Kube, resourceType, resourceName string) (namespace string, options metav1.ListOptions, err error) {
-	var matchLabels map[string]string
-
+func PodsGetterConfiguration(ctx context.Context, kube client.Kube, resourceType, resourceName string) (namespace string, options metav1.ListOptions, postListFilter PodFilter, err error) {
 	switch resourceType {
 	case "ns", "namespace", "namespaces":
 		namespace = resourceName
+
 		return
 
 	case "po", "pod", "pods",
 		"no", "node", "nodes":
 		namespace = kube.Namespace
 		options.FieldSelector, err = PodFieldSelectorGetter(ctx, resourceType, resourceName)
+
 		return
 
 	case "svc", "service", "services":
@@ -82,7 +76,44 @@ func PodsGetterConfiguration(ctx context.Context, kube client.Kube, resourceType
 			return
 		}
 
-		matchLabels = service.Spec.Selector
+		namespace = kube.Namespace
+		options.LabelSelector = LabelSelectorFromMaps(service.Spec.Selector)
+
+		return
+
+	case "cj", "cronjob", "cronjobs":
+		var cronjob *batchv1.CronJob
+		cronjob, err = kube.BatchV1().CronJobs(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
+		if err != nil {
+			return
+		}
+
+		namespace = kube.Namespace
+		options.LabelSelector = "job-name"
+		postListFilter = func(ctx context.Context, kube client.Kube, pod v1.Pod) bool {
+			for _, podReference := range pod.ObjectMeta.OwnerReferences {
+				if podReference.Kind != "Job" {
+					continue
+				}
+
+				job, err := kube.BatchV1().Jobs(cronjob.Namespace).Get(ctx, podReference.Name, metav1.GetOptions{})
+				if err != nil {
+					kube.Warn("get job `%s`: %s", podReference.Name, err)
+
+					continue
+				}
+
+				for _, jobReference := range job.ObjectMeta.OwnerReferences {
+					if jobReference.Kind == "CronJob" && jobReference.Name == cronjob.Name {
+						return true
+					}
+				}
+			}
+
+			return false
+		}
+
+		return
 
 	default:
 		var labelSelector *metav1.LabelSelector
@@ -91,15 +122,11 @@ func PodsGetterConfiguration(ctx context.Context, kube client.Kube, resourceType
 			return
 		}
 
-		if labelSelector != nil {
-			matchLabels = labelSelector.MatchLabels
-		}
+		namespace = kube.Namespace
+		options.LabelSelector = LabelSelectorFromMaps(labelSelector.MatchLabels)
+
+		return
 	}
-
-	namespace = kube.Namespace
-	options.LabelSelector = LabelSelectorFromMaps(matchLabels)
-
-	return
 }
 
 func LabelSelectorFromMaps(labels map[string]string) string {
@@ -118,13 +145,6 @@ func LabelSelectorFromMaps(labels map[string]string) string {
 
 func PodLabelSelectorGetter(ctx context.Context, kube client.Kube, resourceType, resourceName string) (*metav1.LabelSelector, error) {
 	switch resourceType {
-	case "cronjob", "cronjobs":
-		item, err := kube.BatchV1().CronJobs(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
-		if err != nil {
-			return nil, err
-		}
-
-		return item.Spec.JobTemplate.Spec.Selector, nil
 	case "ds", "daemonset", "daemonsets":
 		item, err := kube.AppsV1().DaemonSets(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
 		if err != nil {
