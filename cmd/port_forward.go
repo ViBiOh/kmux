@@ -104,12 +104,7 @@ var portForwardCmd = &cobra.Command{
 				}
 			}
 
-			namespace, listOptions, postListFilter, err := resource.PodsGetterConfiguration(ctx, kube, resourceType, resourceName)
-			if err != nil {
-				return err
-			}
-
-			podWatcher, err := resource.WatchPods(ctx, kube, namespace, listOptions, postListFilter, dryRun)
+			podWatcher, err := resource.WatchPods(ctx, kube, resourceType, resourceName, nil, dryRun)
 			if err != nil {
 				return err
 			}

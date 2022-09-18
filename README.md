@@ -22,7 +22,7 @@ curl \
   --location \
   --max-time 300 \
   --output "/usr/local/bin/kmux"
-  https://github.com/ViBiOh/kmux/releases/download/v0.0.16/kmux_$(uname -s | tr "[:upper:]" "[:lower:]")_amd64
+  https://github.com/ViBiOh/kmux/releases/download/v0.0.17/kmux_$(uname -s | tr "[:upper:]" "[:lower:]")_amd64
 chmod +x "/usr/local/bin/kmux"
 ```
 
@@ -55,8 +55,7 @@ kmux --context central1 --context europe1 --context asia1 image
 ```
 Global Flags:
   -A, --all-namespaces      Find resources in all namespaces
-      --context string      Kubernetes context, multiples values possibles
-  -h, --help                help for kmux
+      --context strings     Kubernetes context, multiple for mutiplexing commands
       --kubeconfig string   Kubernetes configuration file (default "${HOME}/.kube/config")
   -n, --namespace string    Override kubernetes namespace in context
 ```
@@ -69,7 +68,7 @@ Each log line has a prefix of the pod's name and the container name, and also th
 
 The `--containers` can be set multiple times to restrict output to the given containers' name.
 
-```
+```bash
 Get logs of a given resource
 
 Usage:
@@ -92,7 +91,7 @@ Like `log`, `port-forward` command open a pod's watcher on a resource and port-f
 
 A local tcp load-balancer is started on given `local port` that will forward to underlying pods by using round-robin algorithm.
 
-```
+```bash
 Port forward to pods of a resource
 
 Usage:
@@ -103,6 +102,7 @@ Aliases:
 
 Flags:
   -d, --dry-run   Dry-run, print only pods
+  -h, --help      help for port-forward
 ```
 
 ### `watch`
@@ -111,34 +111,42 @@ Flags:
 
 Output is colored according to the current status of the pod, for better clarity.
 
-```
+```bash
 Get all pods in the namespace
 
 Usage:
   kmux watch [flags]
 
 Flags:
-  -o, --output string   Output format. One of: (wide)
+  -h, --help                      help for watch
+  -o, --output string             Output format. One of: (wide)
+  -l, --selector stringToString   Labels to filter pods (default [])
 ```
 
 ### `restart`
 
 `restart` perform the equivalent of a rollout restart on given resource (add an annotation of the pod spec). For `job`, it's the equivalent of a replacement (delete then create).
 
-```
+```bash
 Restart pod of the given resources
 
 Usage:
   kmux restart TYPE NAME [flags]
+
+Flags:
+  -h, --help   help for restart
 ```
 
 ### `image`
 
 `image` prints the image name of all containers found in given resource. The idea is to check that every cluster runs the same version.
 
-```
+```bash
 Get all image names of containers for a given resource
 
 Usage:
   kmux image TYPE NAME [flags]
+
+Flags:
+  -h, --help   help for image
 ```

@@ -15,7 +15,7 @@ type PodFilter func(context.Context, client.Kube, v1.Pod) bool
 
 func PodTemplateGetter(ctx context.Context, kube client.Kube, resourceType, resourceName string) (v1.PodTemplateSpec, error) {
 	switch resourceType {
-	case "cronjob", "cronjobs":
+	case "cj", "cronjob", "cronjobs":
 		item, err := kube.BatchV1().CronJobs(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
 		if err != nil {
 			return v1.PodTemplateSpec{}, err
@@ -55,7 +55,7 @@ func PodTemplateGetter(ctx context.Context, kube client.Kube, resourceType, reso
 	}
 }
 
-func PodsGetterConfiguration(ctx context.Context, kube client.Kube, resourceType, resourceName string) (namespace string, options metav1.ListOptions, postListFilter PodFilter, err error) {
+func podsGetterConfiguration(ctx context.Context, kube client.Kube, resourceType, resourceName string) (namespace string, options metav1.ListOptions, postListFilter PodFilter, err error) {
 	switch resourceType {
 	case "ns", "namespace", "namespaces":
 		namespace = resourceName
@@ -65,7 +65,7 @@ func PodsGetterConfiguration(ctx context.Context, kube client.Kube, resourceType
 	case "po", "pod", "pods",
 		"no", "node", "nodes":
 		namespace = kube.Namespace
-		options.FieldSelector, err = PodFieldSelectorGetter(ctx, resourceType, resourceName)
+		options.FieldSelector, err = podFieldSelectorGetter(ctx, resourceType, resourceName)
 
 		return
 
@@ -73,11 +73,13 @@ func PodsGetterConfiguration(ctx context.Context, kube client.Kube, resourceType
 		var service *v1.Service
 		service, err = kube.CoreV1().Services(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
 		if err != nil {
+			err = fmt.Errorf("get services: %w", err)
+
 			return
 		}
 
 		namespace = kube.Namespace
-		options.LabelSelector = LabelSelectorFromMaps(service.Spec.Selector)
+		options.LabelSelector = labelSelectorFromMaps(service.Spec.Selector)
 
 		return
 
@@ -85,6 +87,8 @@ func PodsGetterConfiguration(ctx context.Context, kube client.Kube, resourceType
 		var cronjob *batchv1.CronJob
 		cronjob, err = kube.BatchV1().CronJobs(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
 		if err != nil {
+			err = fmt.Errorf("get cronjob: %w", err)
+
 			return
 		}
 
@@ -104,7 +108,7 @@ func PodsGetterConfiguration(ctx context.Context, kube client.Kube, resourceType
 				}
 
 				for _, jobReference := range job.ObjectMeta.OwnerReferences {
-					if jobReference.Kind == "CronJob" && jobReference.Name == cronjob.Name {
+					if jobReference.UID == cronjob.UID {
 						return true
 					}
 				}
@@ -117,33 +121,19 @@ func PodsGetterConfiguration(ctx context.Context, kube client.Kube, resourceType
 
 	default:
 		var labelSelector *metav1.LabelSelector
-		labelSelector, err = PodLabelSelectorGetter(ctx, kube, resourceType, resourceName)
+		labelSelector, err = podLabelSelectorGetter(ctx, kube, resourceType, resourceName)
 		if err != nil {
 			return
 		}
 
 		namespace = kube.Namespace
-		options.LabelSelector = LabelSelectorFromMaps(labelSelector.MatchLabels)
+		options.LabelSelector = labelSelectorFromMaps(labelSelector.MatchLabels)
 
 		return
 	}
 }
 
-func LabelSelectorFromMaps(labels map[string]string) string {
-	var labelSelector strings.Builder
-
-	for key, value := range labels {
-		if labelSelector.Len() > 0 {
-			labelSelector.WriteString(",")
-		}
-
-		labelSelector.WriteString(fmt.Sprintf("%s=%s", key, value))
-	}
-
-	return labelSelector.String()
-}
-
-func PodLabelSelectorGetter(ctx context.Context, kube client.Kube, resourceType, resourceName string) (*metav1.LabelSelector, error) {
+func podLabelSelectorGetter(ctx context.Context, kube client.Kube, resourceType, resourceName string) (*metav1.LabelSelector, error) {
 	switch resourceType {
 	case "ds", "daemonset", "daemonsets":
 		item, err := kube.AppsV1().DaemonSets(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
@@ -178,7 +168,7 @@ func PodLabelSelectorGetter(ctx context.Context, kube client.Kube, resourceType,
 	}
 }
 
-func PodFieldSelectorGetter(ctx context.Context, resourceType, resourceName string) (string, error) {
+func podFieldSelectorGetter(ctx context.Context, resourceType, resourceName string) (string, error) {
 	switch resourceType {
 	case "po", "pod", "pods":
 		return fmt.Sprintf("metadata.name=%s", resourceName), nil
@@ -187,6 +177,20 @@ func PodFieldSelectorGetter(ctx context.Context, resourceType, resourceName stri
 	default:
 		return "", unhandledError(resourceType)
 	}
+}
+
+func labelSelectorFromMaps(labels map[string]string) string {
+	var labelSelector strings.Builder
+
+	for key, value := range labels {
+		if labelSelector.Len() > 0 {
+			labelSelector.WriteString(",")
+		}
+
+		labelSelector.WriteString(fmt.Sprintf("%s=%s", key, value))
+	}
+
+	return labelSelector.String()
 }
 
 func unhandledError(resourceType string) error {

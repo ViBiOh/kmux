@@ -32,6 +32,7 @@ func initWatch() {
 	flags := watchCmd.Flags()
 
 	flags.StringVarP(&outputFormat, "output", "o", "", "Output format. One of: (wide)")
+	flags.StringToStringVarP(&labelsSelector, "selector", "l", nil, "Labels to filter pods")
 }
 
 var watchCmd = &cobra.Command{
@@ -50,12 +51,7 @@ var watchCmd = &cobra.Command{
 		initialsPodsHash := displayInitialPods(ctx, watchTable)
 
 		clients.Execute(func(kube client.Kube) error {
-			namespace, listOptions, postListFilter, err := resource.PodsGetterConfiguration(ctx, kube, "namespace", kube.Namespace)
-			if err != nil {
-				return err
-			}
-
-			watcher, err := resource.WatchPods(ctx, kube, namespace, listOptions, postListFilter, false)
+			watcher, err := resource.WatchPods(ctx, kube, "namespace", kube.Namespace, labelsSelector, false)
 			if err != nil {
 				return err
 			}
