@@ -26,7 +26,7 @@ func (dw WrappedWatcher) ResultChan() <-chan watch.Event {
 	return dw.pods
 }
 
-func WatchPods(ctx context.Context, kube client.Kube, resourceType, resourceName string, extraLabels map[string]string, dryRun bool) (watch.Interface, error) {
+func WatchPods(ctx context.Context, kube client.Kube, resourceType, resourceName string, labelSelector map[string]string, dryRun bool) (watch.Interface, error) {
 	var listOptions metav1.ListOptions
 	var postListFilter PodFilter
 	var err error
@@ -40,8 +40,8 @@ func WatchPods(ctx context.Context, kube client.Kube, resourceType, resourceName
 		}
 	}
 
-	if len(extraLabels) > 0 {
-		labelSelector := labelSelectorFromMaps(extraLabels)
+	if len(labelSelector) > 0 {
+		labelSelector := labelSelectorFromMaps(labelSelector)
 		if len(listOptions.LabelSelector) > 0 {
 			listOptions.LabelSelector += ","
 		}

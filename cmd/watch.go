@@ -53,7 +53,7 @@ var watchCmd = &cobra.Command{
 		clients.Execute(func(kube client.Kube) error {
 			watcher, err := resource.WatchPods(ctx, kube, "namespace", kube.Namespace, labelsSelector, false)
 			if err != nil {
-				return err
+				return fmt.Errorf("watch pods: %w", err)
 			}
 
 			defer watcher.Stop()
@@ -114,6 +114,7 @@ func initWatchTable() *table.Table {
 	return watchTable
 }
 
+// displayInitialPods for printing first list in chronological order
 func displayInitialPods(ctx context.Context, watchTable *table.Table) map[string]bool {
 	var listPods []watchPod
 	initialPods := make(chan watchPod, 4)
@@ -128,14 +129,21 @@ func displayInitialPods(ctx context.Context, watchTable *table.Table) map[string
 	}()
 
 	clients.Execute(func(kube client.Kube) error {
-		pods, err := kube.CoreV1().Pods(kube.Namespace).List(ctx, metav1.ListOptions{})
+		watcher, err := resource.WatchPods(ctx, kube, "namespace", kube.Namespace, labelsSelector, true)
 		if err != nil {
-			return err
+			return fmt.Errorf("watch pods: %w", err)
 		}
 
-		for _, pod := range pods.Items {
+		defer watcher.Stop()
+
+		for event := range watcher.ResultChan() {
+			pod, ok := event.Object.(*v1.Pod)
+			if !ok {
+				continue
+			}
+
 			initialPods <- watchPod{
-				Pod:         pod,
+				Pod:         *pod,
 				ContextName: kube.Name,
 			}
 		}
