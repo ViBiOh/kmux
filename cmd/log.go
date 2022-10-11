@@ -32,6 +32,9 @@ var (
 
 	containersName   []string
 	containersRegexp []*regexp.Regexp
+
+	logFilter       string
+	logFilterRegexp *regexp.Regexp
 )
 
 var logCmd = &cobra.Command{
@@ -89,6 +92,15 @@ var logCmd = &cobra.Command{
 				containersRegexp = append(containersRegexp, re)
 			} else {
 				containersName = append(containersName, container)
+			}
+		}
+
+		if len(logFilter) > 0 {
+			var err error
+
+			logFilterRegexp, err = regexp.Compile(logFilter)
+			if err != nil {
+				return fmt.Errorf("log filter compile: %w", err)
 			}
 		}
 
@@ -152,6 +164,7 @@ func initLog() {
 	flags.StringSliceVarP(&containers, "containers", "c", nil, "Filter container's name, default to all containers, supports regexp")
 	flags.BoolVarP(&dryRun, "dry-run", "d", false, "Dry-run, print only pods")
 	flags.StringToStringVarP(&labelsSelector, "selector", "l", nil, "Labels to filter pods")
+	flags.StringVarP(&logFilter, "grep", "g", "", "Regexp to filter log")
 }
 
 func handleLogPod(ctx context.Context, activeStreams *sync.Map, streaming *concurrent.Simple, kube client.Kube, pod v1.Pod) {
@@ -225,7 +238,11 @@ func outputLog(reader io.Reader, kube client.Kube, name, container string) {
 	streamScanner.Split(bufio.ScanLines)
 
 	for streamScanner.Scan() {
-		outputter.Std(streamScanner.Text())
+		text := streamScanner.Text()
+
+		if logFilterRegexp == nil || logFilterRegexp.MatchString(text) {
+			outputter.Std(text)
+		}
 	}
 }
 
