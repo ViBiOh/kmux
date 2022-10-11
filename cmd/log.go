@@ -238,11 +238,22 @@ func outputLog(reader io.Reader, kube client.Kube, name, container string) {
 	streamScanner.Split(bufio.ScanLines)
 
 	for streamScanner.Scan() {
+		if logFilterRegexp == nil {
+			outputter.Std(streamScanner.Text())
+			continue
+		}
+
 		text := streamScanner.Text()
 
-		if logFilterRegexp == nil || logFilterRegexp.MatchString(text) {
-			outputter.Std(text)
+		if !logFilterRegexp.MatchString(text) {
+			continue
 		}
+
+		text = logFilterRegexp.ReplaceAllStringFunc(text, func(value string) string {
+			return output.Red(value)
+		})
+
+		outputter.Std(text)
 	}
 }
 
