@@ -56,7 +56,7 @@ var portForwardCmd = &cobra.Command{
 
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
-	Args: cobra.ExactValidArgs(3),
+	Args: cobra.MatchAll(cobra.ExactArgs(3), cobra.OnlyValidArgs),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		resourceType := args[0]
 		resourceName := args[1]
