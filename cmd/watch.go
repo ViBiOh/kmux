@@ -311,21 +311,28 @@ func getPodStatus(pod v1.Pod) (string, uint, uint, time.Time) {
 				}
 			}
 
+			var containerReason string
+			var containerExitCode int32
+
 			if container.State.Waiting != nil && container.State.Waiting.Reason != "" {
-				reason = container.State.Waiting.Reason
-			} else if container.State.Terminated != nil && container.State.Terminated.Reason != "" && exitCode == 0 {
-				exitCode = container.State.Terminated.ExitCode
-				reason = container.State.Terminated.Reason
-			} else if container.State.Terminated != nil && container.State.Terminated.Reason == "" && exitCode == 0 {
-				exitCode = container.State.Terminated.ExitCode
+				containerReason = container.State.Waiting.Reason
+			} else if container.State.Terminated != nil && container.State.Terminated.Reason != "" {
+				containerReason = container.State.Terminated.Reason
+				containerExitCode = container.State.Terminated.ExitCode
+			} else if container.State.Terminated != nil && container.State.Terminated.Reason == "" {
 				if container.State.Terminated.Signal != 0 {
-					reason = fmt.Sprintf("Signal:%d", container.State.Terminated.Signal)
+					containerReason = fmt.Sprintf("Signal:%d", container.State.Terminated.Signal)
 				} else {
-					reason = fmt.Sprintf("ExitCode:%d", container.State.Terminated.ExitCode)
+					containerReason = fmt.Sprintf("ExitCode:%d", container.State.Terminated.ExitCode)
 				}
 			} else if container.Ready && container.State.Running != nil {
 				hasRunning = true
 				ready++
+			}
+
+			if exitCode == 0 && len(containerReason) > 0 {
+				reason = containerReason
+				exitCode = containerExitCode
 			}
 		}
 
