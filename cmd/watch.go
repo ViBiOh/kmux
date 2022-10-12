@@ -297,6 +297,7 @@ func getPodStatus(pod v1.Pod) (string, uint, uint, time.Time) {
 	if !initializing {
 		restart = 0
 		hasRunning := false
+		var exitCode int32
 
 		for i := len(pod.Status.ContainerStatuses) - 1; i >= 0; i-- {
 			container := pod.Status.ContainerStatuses[i]
@@ -312,9 +313,11 @@ func getPodStatus(pod v1.Pod) (string, uint, uint, time.Time) {
 
 			if container.State.Waiting != nil && container.State.Waiting.Reason != "" {
 				reason = container.State.Waiting.Reason
-			} else if container.State.Terminated != nil && container.State.Terminated.Reason != "" {
+			} else if container.State.Terminated != nil && container.State.Terminated.Reason != "" && exitCode == 0 {
+				exitCode = container.State.Terminated.ExitCode
 				reason = container.State.Terminated.Reason
-			} else if container.State.Terminated != nil && container.State.Terminated.Reason == "" {
+			} else if container.State.Terminated != nil && container.State.Terminated.Reason == "" && exitCode == 0 {
+				exitCode = container.State.Terminated.ExitCode
 				if container.State.Terminated.Signal != 0 {
 					reason = fmt.Sprintf("Signal:%d", container.State.Terminated.Signal)
 				} else {
