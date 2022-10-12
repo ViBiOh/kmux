@@ -22,7 +22,7 @@ curl \
   --location \
   --max-time 300 \
   --output "/usr/local/bin/kmux"
-  https://github.com/ViBiOh/kmux/releases/download/v0.0.17/kmux_$(uname -s | tr "[:upper:]" "[:lower:]")_amd64
+  https://github.com/ViBiOh/kmux/releases/download/v0.1.0/kmux_$(uname -s | tr "[:upper:]" "[:lower:]")_amd64
 chmod +x "/usr/local/bin/kmux"
 ```
 
@@ -80,6 +80,7 @@ Aliases:
 Flags:
   -c, --containers strings        Filter container's name, default to all containers, supports regexp
   -d, --dry-run                   Dry-run, print only pods
+  -g, --grep string               Regexp to filter log
   -h, --help                      help for log
   -l, --selector stringToString   Labels to filter pods (default [])
   -s, --since duration            Display logs since given duration (default 1h0m0s)
