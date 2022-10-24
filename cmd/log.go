@@ -33,6 +33,9 @@ var (
 	containersName   []string
 	containersRegexp []*regexp.Regexp
 
+	levelKey      string
+	statusCodeKey string
+
 	logFilter       string
 	logFilterRegexp *regexp.Regexp
 )
@@ -165,6 +168,8 @@ func initLog() {
 	flags.BoolVarP(&dryRun, "dry-run", "d", false, "Dry-run, print only pods")
 	flags.StringToStringVarP(&labelsSelector, "selector", "l", nil, "Labels to filter pods")
 	flags.StringVarP(&logFilter, "grep", "g", "", "Regexp to filter log")
+	flags.StringVar(&levelKey, "levelKey", "level", "Key for level in JSON")
+	flags.StringVar(&statusCodeKey, "statusCodeKey", "statusCode", "Key for HTTP Status code in JSON")
 }
 
 func handleLogPod(ctx context.Context, activeStreams *sync.Map, streaming *concurrent.Simple, kube client.Kube, pod v1.Pod) {
@@ -238,12 +243,17 @@ func outputLog(reader io.Reader, kube client.Kube, name, container string) {
 	streamScanner.Split(bufio.ScanLines)
 
 	for streamScanner.Scan() {
-		if logFilterRegexp == nil {
-			outputter.Std(streamScanner.Text())
-			continue
+		text := streamScanner.Text()
+
+		if colorOutputter := getColorFromJSON(strings.NewReader(text), levelKey, statusCodeKey); colorOutputter != nil {
+			text = colorOutputter(text)
 		}
 
-		text := streamScanner.Text()
+		if logFilterRegexp == nil {
+			outputter.Std(text)
+
+			continue
+		}
 
 		if !logFilterRegexp.MatchString(text) {
 			continue

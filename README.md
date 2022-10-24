@@ -82,8 +82,10 @@ Flags:
   -d, --dry-run                   Dry-run, print only pods
   -g, --grep string               Regexp to filter log
   -h, --help                      help for log
+      --levelKey string           Key for level in JSON (default "level")
   -l, --selector stringToString   Labels to filter pods (default [])
   -s, --since duration            Display logs since given duration (default 1h0m0s)
+      --statusCodeKey string      Key for HTTP Status code in JSON (default "statusCode")
 ```
 
 ### `port-forward`
