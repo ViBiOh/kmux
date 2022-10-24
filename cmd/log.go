@@ -33,8 +33,7 @@ var (
 	containersName   []string
 	containersRegexp []*regexp.Regexp
 
-	levelKey      string
-	statusCodeKey string
+	jsonColorKeys []string
 
 	logFilter       string
 	logFilterRegexp *regexp.Regexp
@@ -107,6 +106,14 @@ var logCmd = &cobra.Command{
 			}
 		}
 
+		if levelKey := viper.GetString("levelKey"); len(levelKey) != 0 {
+			jsonColorKeys = append(jsonColorKeys, levelKey)
+		}
+
+		if statusCodeKey := viper.GetString("statusCodeKey"); len(statusCodeKey) != 0 {
+			jsonColorKeys = append(jsonColorKeys, statusCodeKey)
+		}
+
 		var resourceType, resourceName string
 		if len(args) > 1 {
 			resourceType = args[0]
@@ -168,8 +175,16 @@ func initLog() {
 	flags.BoolVarP(&dryRun, "dry-run", "d", false, "Dry-run, print only pods")
 	flags.StringToStringVarP(&labelsSelector, "selector", "l", nil, "Labels to filter pods")
 	flags.StringVarP(&logFilter, "grep", "g", "", "Regexp to filter log")
-	flags.StringVar(&levelKey, "levelKey", "level", "Key for level in JSON")
-	flags.StringVar(&statusCodeKey, "statusCodeKey", "statusCode", "Key for HTTP Status code in JSON")
+
+	flags.String("levelKey", "level", "Key for level in JSON")
+	if err := viper.BindPFlag("levelKey", flags.Lookup("levelKey")); err != nil {
+		output.Fatal("bind `levelKey` flag: %s", err)
+	}
+
+	flags.String("statusCodeKey", "statusCode", "Key for HTTP Status code in JSON")
+	if err := viper.BindPFlag("statusCodeKey", flags.Lookup("statusCodeKey")); err != nil {
+		output.Fatal("bind `statusCodeKey` flag: %s", err)
+	}
 }
 
 func handleLogPod(ctx context.Context, activeStreams *sync.Map, streaming *concurrent.Simple, kube client.Kube, pod v1.Pod) {
@@ -245,8 +260,10 @@ func outputLog(reader io.Reader, kube client.Kube, name, container string) {
 	for streamScanner.Scan() {
 		text := streamScanner.Text()
 
-		if colorOutputter := getColorFromJSON(strings.NewReader(text), levelKey, statusCodeKey); colorOutputter != nil {
-			text = colorOutputter(text)
+		if len(jsonColorKeys) > 0 {
+			if colorOutputter := getColorFromJSON(strings.NewReader(text), jsonColorKeys...); colorOutputter != nil {
+				text = colorOutputter(text)
+			}
 		}
 
 		if logFilterRegexp == nil {
