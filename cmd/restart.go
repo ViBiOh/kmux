@@ -55,7 +55,7 @@ var restartCmd = &cobra.Command{
 
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
-	Args: cobra.MatchAll(cobra.ExactArgs(3), cobra.OnlyValidArgs),
+	Args: cobra.MatchAll(cobra.ExactArgs(2), cobra.OnlyValidArgs),
 	Run: func(cmd *cobra.Command, args []string) {
 		resourceType := args[0]
 		resourceName := args[1]
