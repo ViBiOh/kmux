@@ -15,7 +15,7 @@ type Pool struct {
 	done     chan struct{}
 	backends []string
 	current  uint64
-	sync.RWMutex
+	mutex    sync.Mutex
 }
 
 func New() *Pool {
@@ -27,8 +27,8 @@ func (bp *Pool) Done() <-chan struct{} {
 }
 
 func (bp *Pool) Add(backend string) *Pool {
-	bp.Lock()
-	defer bp.Unlock()
+	bp.mutex.Lock()
+	defer bp.mutex.Unlock()
 
 	bp.backends = append(bp.backends, backend)
 
@@ -36,8 +36,8 @@ func (bp *Pool) Add(backend string) *Pool {
 }
 
 func (bp *Pool) Remove(toRemove string) *Pool {
-	bp.Lock()
-	defer bp.Unlock()
+	bp.mutex.Lock()
+	defer bp.mutex.Unlock()
 
 	backends := bp.backends[:0]
 	for _, backend := range bp.backends {
@@ -54,8 +54,8 @@ func (bp *Pool) Remove(toRemove string) *Pool {
 }
 
 func (bp *Pool) next() string {
-	bp.Lock()
-	defer bp.Unlock()
+	bp.mutex.Lock()
+	defer bp.mutex.Unlock()
 
 	backendsLen := uint64(len(bp.backends))
 	if backendsLen == 0 {
