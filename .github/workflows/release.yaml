@@ -29,6 +29,8 @@ jobs:
   tag:
     name: Release
     runs-on: ubuntu-latest
+    env:
+      gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -38,11 +40,24 @@ jobs:
           go-version: "^1.19"
       - name: Build
         run: make init
+      - name: GPG
+        id: import_gpg
+        if: ${{ env.gpg_private_key != '' }}
+        uses: crazy-max/ghaction-import-gpg@v4
+        with:
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
       - name: Assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
         run: |
           curl --disable --silent --show-error --location --max-time 30 "https://raw.githubusercontent.com/ViBiOh/scripts/main/bootstrap" | bash -s -- "-c" "release"
           export GIT_TAG="$(basename ${{ github.ref }})"
-          export GO_VERSION_PATH="github.com/${{ github.repository }}/cmd.Version"
           scripts/release build assets clean
+      - name: Docker
+        env:
+          DOCKER_USER: ${{ secrets.DOCKER_USER }}
+          DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
+        run: |
+          curl --disable --silent --show-error --location --max-time 30 "https://raw.githubusercontent.com/ViBiOh/scripts/main/bootstrap" | bash -s -- "-c" "docker_promote"
+          scripts/docker_promote "${{ secrets.DOCKER_USER }}/$(make name)" "$(make version-date)" "$(basename ${{ github.ref }})"
