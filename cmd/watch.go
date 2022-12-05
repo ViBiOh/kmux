@@ -194,7 +194,12 @@ func outputWatch(watchTable *table.Table, contextName string, pod v1.Pod) {
 
 	var restartText string
 	if restart > 0 {
-		restartText = fmt.Sprintf("%-14s", fmt.Sprintf("%d (%s ago)", restart, duration.HumanDuration(time.Since(lastRestartDate))))
+		restartValue := fmt.Sprintf("%d", restart)
+		if !lastRestartDate.IsZero() {
+			restartValue += fmt.Sprintf(" (%s ago)", duration.HumanDuration(time.Since(lastRestartDate)))
+		}
+
+		restartText = fmt.Sprintf("%-14s", restartValue)
 	}
 
 	var readyColor *color.Color
