@@ -31,6 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+      docker_user: ${{ secrets.DOCKER_USER }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -56,9 +57,10 @@ jobs:
           export GIT_TAG="$(basename ${{ github.ref }})"
           scripts/release build assets clean
       - name: Docker
+        if: ${{ env.docker_user != '' }}
         env:
-          DOCKER_USER: ${{ secrets.DOCKER_USER }}
+          DOCKER_USER: ${{ env.docker_user }}
           DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
         run: |
           curl --disable --silent --show-error --location --max-time 30 "https://raw.githubusercontent.com/ViBiOh/scripts/main/bootstrap" | bash -s -- "-c" "docker_promote"
-          scripts/docker_promote "${{ secrets.DOCKER_USER }}/$(make name)" "$(make version-date)" "$(basename ${{ github.ref }})"
+          scripts/docker_promote "${{ env.DOCKER_USER }}/$(make name)" "$(make version-date)" "$(basename ${{ github.ref }})"
