@@ -68,7 +68,7 @@ var logCmd = &cobra.Command{
 				return nil, cobra.ShellCompDirectiveError
 			}
 
-			return getCommonObjects(viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
+			return getCommonObjects(cmd.Context(), viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
 		}
 
 		return nil, cobra.ShellCompDirectiveNoFileComp
@@ -78,7 +78,7 @@ var logCmd = &cobra.Command{
 			return errors.New("either labels or `TYPE NAME` args must be specified")
 		}
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
 
 		go func() {
@@ -120,7 +120,7 @@ var logCmd = &cobra.Command{
 			resourceName = args[1]
 		}
 
-		clients.Execute(func(kube client.Kube) error {
+		clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
 			podWatcher, err := resource.WatchPods(ctx, kube, resourceType, resourceName, labelsSelector, dryRun)
 			if err != nil {
 				return fmt.Errorf("watch pods: %w", err)

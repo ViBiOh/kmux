@@ -1,6 +1,8 @@
 package client
 
 import (
+	"context"
+
 	"github.com/ViBiOh/kmux/pkg/concurrent"
 	"github.com/ViBiOh/kmux/pkg/output"
 	"k8s.io/client-go/kubernetes"
@@ -25,18 +27,18 @@ func New(name, namespace string, config *rest.Config, clientset *kubernetes.Clie
 	}
 }
 
-type Action func(Kube) error
+type Action func(context.Context, Kube) error
 
 type Array []Kube
 
-func (a Array) Execute(action Action) {
+func (a Array) Execute(ctx context.Context, action Action) {
 	parallel := concurrent.NewSimple()
 
 	for _, client := range a {
 		client := client
 
 		parallel.Go(func() {
-			if err := action(client); err != nil {
+			if err := action(ctx, client); err != nil {
 				client.Err("%s", err)
 			}
 		})

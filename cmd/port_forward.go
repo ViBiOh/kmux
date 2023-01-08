@@ -51,7 +51,7 @@ var portForwardCmd = &cobra.Command{
 				return nil, cobra.ShellCompDirectiveError
 			}
 
-			return getCommonObjects(viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
+			return getCommonObjects(cmd.Context(), viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
 		}
 
 		return nil, cobra.ShellCompDirectiveNoFileComp
@@ -76,7 +76,7 @@ var portForwardCmd = &cobra.Command{
 			remotePort = ports[0]
 		}
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
 
 		output.Std("", "Listening tcp on %d", localPort)
@@ -92,7 +92,7 @@ var portForwardCmd = &cobra.Command{
 			cancel()
 		}()
 
-		clients.Execute(func(kube client.Kube) error {
+		clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
 			remotePort := remotePort
 
 			if resource.IsService(resourceType) {

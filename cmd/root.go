@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -37,7 +38,7 @@ var rootCmd = &cobra.Command{
 		<-output.Done()
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		clients.Execute(func(kube client.Kube) error {
+		clients.Execute(cmd.Context(), func(ctx context.Context, kube client.Kube) error {
 			info, err := kube.Discovery().ServerVersion()
 			if err != nil {
 				return fmt.Errorf("get server version: %w", err)
@@ -172,7 +173,7 @@ func completeContext(_ *cobra.Command, _ []string, _ string) ([]string, cobra.Sh
 	return completeContexts, cobra.ShellCompDirectiveNoFileComp
 }
 
-func completeNamespace(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+func completeNamespace(cmd *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 	lister, err := resource.ListerFor("namespace")
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveError
@@ -183,7 +184,7 @@ func completeNamespace(_ *cobra.Command, _ []string, _ string) ([]string, cobra.
 		return nil, cobra.ShellCompDirectiveError
 	}
 
-	return getCommonObjects("", lister), cobra.ShellCompDirectiveDefault
+	return getCommonObjects(cmd.Context(), "", lister), cobra.ShellCompDirectiveDefault
 }
 
 func contains(arr []string, value string) bool {

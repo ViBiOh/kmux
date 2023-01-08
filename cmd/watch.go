@@ -39,7 +39,7 @@ var watchCmd = &cobra.Command{
 	Use:   "watch",
 	Short: "Get all pods in the namespace",
 	Run: func(cmd *cobra.Command, args []string) {
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
 
 		go func() {
@@ -50,7 +50,7 @@ var watchCmd = &cobra.Command{
 		watchTable := initWatchTable()
 		initialsPodsHash := displayInitialPods(ctx, watchTable)
 
-		clients.Execute(func(kube client.Kube) error {
+		clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
 			watcher, err := resource.WatchPods(ctx, kube, "namespace", kube.Namespace, labelsSelector, false)
 			if err != nil {
 				return fmt.Errorf("watch pods: %w", err)
@@ -128,7 +128,7 @@ func displayInitialPods(ctx context.Context, watchTable *table.Table) map[string
 		}
 	}()
 
-	clients.Execute(func(kube client.Kube) error {
+	clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
 		watcher, err := resource.WatchPods(ctx, kube, "namespace", kube.Namespace, labelsSelector, true)
 		if err != nil {
 			return fmt.Errorf("watch pods: %w", err)

@@ -50,7 +50,7 @@ var restartCmd = &cobra.Command{
 				return nil, cobra.ShellCompDirectiveError
 			}
 
-			return getCommonObjects(viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
+			return getCommonObjects(cmd.Context(), viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
 		}
 
 		return nil, cobra.ShellCompDirectiveNoFileComp
@@ -60,7 +60,7 @@ var restartCmd = &cobra.Command{
 		resourceType := args[0]
 		resourceName := args[1]
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
 
 		var patch restartPatch
@@ -74,7 +74,7 @@ var restartCmd = &cobra.Command{
 			return
 		}
 
-		clients.Execute(func(kube client.Kube) error {
+		clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
 			switch resourceType {
 			case "ds", "daemonset", "daemonsets":
 				_, err := kube.AppsV1().DaemonSets(kube.Namespace).Patch(ctx, resourceName, types.MergePatchType, payload, v1.PatchOptions{})

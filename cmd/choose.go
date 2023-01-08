@@ -21,7 +21,7 @@ func getCommonNamespace(kube client.Kube, namespace string) string {
 	return ""
 }
 
-func getCommonObjects(namespace string, lister resource.Lister) []string {
+func getCommonObjects(ctx context.Context, namespace string, lister resource.Lister) []string {
 	output := make(chan string, len(clients))
 	successChan := make(chan bool, len(clients))
 
@@ -29,8 +29,8 @@ func getCommonObjects(namespace string, lister resource.Lister) []string {
 		defer close(output)
 		defer close(successChan)
 
-		clients.Execute(func(kube client.Kube) error {
-			items, err := lister(context.Background(), kube, getCommonNamespace(kube, namespace), metav1.ListOptions{})
+		clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
+			items, err := lister(ctx, kube, getCommonNamespace(kube, namespace), metav1.ListOptions{})
 			if err != nil {
 				return err
 			}
