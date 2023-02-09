@@ -10,45 +10,56 @@ import (
 	"github.com/ViBiOh/kmux/pkg/output"
 )
 
+const defaultColor = 2
+
+var colorOrder = map[string]uint{
+	"red":    0,
+	"yellow": 1,
+	"white":  defaultColor,
+	"green":  3,
+}
+
 type Formatter func(a ...interface{}) string
 
-func getColorFromJSON(stream io.Reader, keys ...string) Formatter {
+func getColorFromJSON(stream io.Reader, keys ...string) (uint, Formatter) {
 	decoder := json.NewDecoder(stream)
 
 	if err := moveDecoderToKey(decoder, keys...); err != nil {
-		return nil
+		return defaultColor, nil
 	}
 
 	token, err := decoder.Token()
 	if err != nil {
-		return nil
+		return defaultColor, nil
 	}
 
 	switch value := token.(type) {
 	case string:
 		switch strings.ToLower(value) {
-		case "warn", "warning":
-			return output.Yellow
 		case "error", "critical", "fatal":
-			return output.Red
+			return 0, output.Red
+		case "warn", "warning":
+			return 1, output.Yellow
 		case "trace", "debug":
-			return output.Green
+			return 3, output.Green
 		default:
-			return nil
+			return defaultColor, nil
 		}
+
 	case float64:
 		switch {
 		case value >= http.StatusInternalServerError:
-			return output.Red
+			return 0, output.Red
 		case value >= http.StatusBadRequest:
-			return output.Yellow
+			return 1, output.Yellow
 		case value >= http.StatusMultipleChoices:
-			return output.Green
+			return 3, output.Green
 		default:
-			return nil
+			return defaultColor, nil
 		}
+
 	default:
-		return nil
+		return defaultColor, nil
 	}
 }
 

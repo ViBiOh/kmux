@@ -36,6 +36,7 @@ var (
 	jsonColorKeys []string
 
 	logFilter       string
+	logColorFilter  uint = 64
 	logFilterRegexp *regexp.Regexp
 )
 
@@ -103,6 +104,12 @@ var logCmd = &cobra.Command{
 			logFilterRegexp, err = regexp.Compile(logFilter)
 			if err != nil {
 				return fmt.Errorf("log filter compile: %w", err)
+			}
+		}
+
+		if grepColor := viper.GetString("grepColor"); len(grepColor) != 0 {
+			if value, ok := colorOrder[strings.ToLower(grepColor)]; ok {
+				logColorFilter = value
 			}
 		}
 
@@ -174,7 +181,13 @@ func initLog() {
 	flags.StringSliceVarP(&containers, "containers", "c", nil, "Filter container's name, default to all containers, supports regexp")
 	flags.BoolVarP(&dryRun, "dry-run", "d", false, "Dry-run, print only pods")
 	flags.StringToStringVarP(&labelsSelector, "selector", "l", nil, "Labels to filter pods")
+
 	flags.StringVarP(&logFilter, "grep", "g", "", "Regexp to filter log")
+
+	flags.String("grepColor", "", "Get logs only above given color (red > yellow > green)")
+	if err := viper.BindPFlag("grepColor", flags.Lookup("grepColor")); err != nil {
+		output.Fatal("bind `grepColor` flag: %s", err)
+	}
 
 	flags.String("levelKey", "level", "Key for level in JSON")
 	if err := viper.BindPFlag("levelKey", flags.Lookup("levelKey")); err != nil {
@@ -257,13 +270,21 @@ func outputLog(reader io.Reader, kube client.Kube, name, container string) {
 	streamScanner := bufio.NewScanner(reader)
 	streamScanner.Split(bufio.ScanLines)
 
+	var colorIndex uint
+	var colorOutputter Formatter
+
 	for streamScanner.Scan() {
 		text := streamScanner.Text()
+		colorIndex = defaultColor
 
 		if len(jsonColorKeys) > 0 {
-			if colorOutputter := getColorFromJSON(strings.NewReader(text), jsonColorKeys...); colorOutputter != nil {
+			if colorIndex, colorOutputter = getColorFromJSON(strings.NewReader(text), jsonColorKeys...); colorOutputter != nil {
 				text = colorOutputter(text)
 			}
+		}
+
+		if colorIndex > logColorFilter {
+			continue
 		}
 
 		if logFilterRegexp == nil {
