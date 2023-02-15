@@ -381,22 +381,29 @@ func getPodWide(pod v1.Pod) (string, string, string, string) {
 
 	readinessGates := noneValue
 	if len(pod.Spec.ReadinessGates) > 0 {
-		trueConditions := 0
-		for _, readinessGate := range pod.Spec.ReadinessGates {
-			conditionType := readinessGate.ConditionType
-			for _, condition := range pod.Status.Conditions {
-				if condition.Type == conditionType {
-					if condition.Status == v1.ConditionTrue {
-						trueConditions++
-					}
-					break
-				}
-			}
-		}
-		readinessGates = fmt.Sprintf("%d/%d", trueConditions, len(pod.Spec.ReadinessGates))
+		readinessGates = fmt.Sprintf("%d/%d", getTrueReadyConditions(pod.Spec.ReadinessGates, pod.Status.Conditions), len(pod.Spec.ReadinessGates))
 	}
 
 	return podIP, nodeName, nominatedNodeName, readinessGates
+}
+
+func getTrueReadyConditions(gates []v1.PodReadinessGate, conditions []v1.PodCondition) uint {
+	var output uint
+
+	for _, readinessGate := range gates {
+		conditionType := readinessGate.ConditionType
+
+		for _, condition := range conditions {
+			if condition.Type == conditionType {
+				if condition.Status == v1.ConditionTrue {
+					output++
+				}
+				break
+			}
+		}
+	}
+
+	return output
 }
 
 func hasPodReadyCondition(conditions []v1.PodCondition) bool {

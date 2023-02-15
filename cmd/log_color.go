@@ -74,28 +74,21 @@ func moveDecoderToKey(decoder *json.Decoder, keys ...string) error {
 			return fmt.Errorf("decode token: %w", err)
 		}
 
-		if nested == 1 {
-			tokenStr := fmt.Sprintf("%s", token)
-			var found bool
+		tokenStr := fmt.Sprintf("%s", token)
 
+		if nested == 1 {
 			for _, key := range keys {
 				if strings.EqualFold(tokenStr, key) {
-					found = true
-					break
+					return nil
 				}
-			}
-
-			if found {
-				break
 			}
 		}
 
-		if strToken := fmt.Sprintf("%s", token); strToken == "{" {
+		switch tokenStr {
+		case "{":
 			nested++
-		} else if strToken == "}" {
+		case "}":
 			nested--
 		}
 	}
-
-	return nil
 }
