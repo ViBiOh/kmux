@@ -277,7 +277,7 @@ func outputLog(reader io.Reader, kube client.Kube, name, container string) {
 		text := streamScanner.Text()
 		colorIndex = defaultColor
 
-		if len(jsonColorKeys) > 0 {
+		if strings.HasPrefix(text, "{") && len(jsonColorKeys) > 0 {
 			if colorIndex, colorOutputter = getColorFromJSON(strings.NewReader(text), jsonColorKeys...); colorOutputter != nil {
 				text = colorOutputter(text)
 			}

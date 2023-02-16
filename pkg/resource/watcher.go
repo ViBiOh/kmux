@@ -55,7 +55,11 @@ func WatchPods(ctx context.Context, kube client.Kube, resourceType, resourceName
 
 	listOptions.Watch = true
 
-	watcher, err := kube.CoreV1().Pods(namespace).Watch(ctx, listOptions)
+	return watchPods(ctx, kube, namespace, listOptions, postListFilter)
+}
+
+func watchPods(ctx context.Context, kube client.Kube, namespace string, options metav1.ListOptions, postListFilter PodFilter) (watch.Interface, error) {
+	watcher, err := kube.CoreV1().Pods(namespace).Watch(ctx, options)
 	if err != nil {
 		return nil, fmt.Errorf("watch: %w", err)
 	}
@@ -90,7 +94,7 @@ func WatchPods(ctx context.Context, kube client.Kube, resourceType, resourceName
 func watchPodsDry(ctx context.Context, kube client.Kube, namespace string, options metav1.ListOptions, postListFilter PodFilter) (watch.Interface, error) {
 	pods, err := kube.CoreV1().Pods(namespace).List(ctx, options)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list: %w", err)
 	}
 
 	items := pods.Items[:0]
