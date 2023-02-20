@@ -176,7 +176,7 @@ func getTargetPort(ctx context.Context, kube client.Kube, name, port string) (st
 	}
 
 	for _, servicePort := range service.Spec.Ports {
-		if servicePort.Name == port || string(servicePort.Port) == port {
+		if servicePort.Name == port || strconv.FormatInt(int64(servicePort.Port), 10) == port {
 			return string(servicePort.TargetPort.StrVal), nil
 		}
 	}
