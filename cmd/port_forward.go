@@ -176,8 +176,12 @@ func getTargetPort(ctx context.Context, kube client.Kube, name, port string) (st
 	}
 
 	for _, servicePort := range service.Spec.Ports {
-		if servicePort.Name == port || strconv.FormatInt(int64(servicePort.Port), 10) == port {
-			return string(servicePort.TargetPort.StrVal), nil
+		if servicePort.Name == port || strconv.Itoa(int(servicePort.Port)) == port {
+			if len(servicePort.TargetPort.StrVal) != 0 {
+				return servicePort.TargetPort.StrVal, nil
+			}
+
+			return strconv.Itoa(int(servicePort.TargetPort.IntVal)), nil
 		}
 	}
 
@@ -193,6 +197,10 @@ func getForwardPort(pod *v1.Pod, remotePort string) int32 {
 	for _, container := range pod.Spec.Containers {
 		for _, port := range container.Ports {
 			if port.Name == remotePort {
+				return port.ContainerPort
+			}
+
+			if strconv.Itoa(int(port.ContainerPort)) == remotePort {
 				return port.ContainerPort
 			}
 		}
