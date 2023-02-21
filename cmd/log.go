@@ -201,7 +201,7 @@ func initLog() {
 }
 
 func handleLogPod(ctx context.Context, activeStreams *sync.Map, streaming *concurrent.Simple, kube client.Kube, pod v1.Pod) {
-	for _, container := range pod.Spec.Containers {
+	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		if !isContainerSelected(container) {
 			continue
 		}
