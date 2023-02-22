@@ -65,7 +65,7 @@ func podsGetterConfiguration(ctx context.Context, kube client.Kube, resourceType
 	case "po", "pod", "pods",
 		"no", "node", "nodes":
 		namespace = kube.Namespace
-		options.FieldSelector, err = podFieldSelectorGetter(ctx, resourceType, resourceName)
+		options.FieldSelector, err = podFieldSelectorGetter(resourceType, resourceName)
 
 		return
 
@@ -168,7 +168,7 @@ func podLabelSelectorGetter(ctx context.Context, kube client.Kube, resourceType,
 	}
 }
 
-func podFieldSelectorGetter(ctx context.Context, resourceType, resourceName string) (string, error) {
+func podFieldSelectorGetter(resourceType, resourceName string) (string, error) {
 	switch resourceType {
 	case "po", "pod", "pods":
 		return fmt.Sprintf("metadata.name=%s", resourceName), nil

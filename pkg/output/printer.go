@@ -29,7 +29,7 @@ func startPrinter() {
 
 		for _, line := range strings.Split(message, "\n") {
 			if len(outputEvent.prefix) > 0 {
-				fmt.Fprint(os.Stderr, outputEvent.prefix)
+				_, _ = fmt.Fprint(os.Stderr, outputEvent.prefix)
 			}
 
 			fd := os.Stderr
@@ -37,7 +37,7 @@ func startPrinter() {
 				fd = os.Stdout
 			}
 
-			fmt.Fprint(fd, line, "\n")
+			_, _ = fmt.Fprint(fd, line, "\n")
 		}
 	}
 }

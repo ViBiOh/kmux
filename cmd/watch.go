@@ -388,7 +388,7 @@ func getPodWide(pod v1.Pod) (string, string, string, string) {
 }
 
 func getTrueReadyConditions(gates []v1.PodReadinessGate, conditions []v1.PodCondition) uint {
-	var output uint
+	var ready uint
 
 	for _, readinessGate := range gates {
 		conditionType := readinessGate.ConditionType
@@ -396,14 +396,14 @@ func getTrueReadyConditions(gates []v1.PodReadinessGate, conditions []v1.PodCond
 		for _, condition := range conditions {
 			if condition.Type == conditionType {
 				if condition.Status == v1.ConditionTrue {
-					output++
+					ready++
 				}
 				break
 			}
 		}
 	}
 
-	return output
+	return ready
 }
 
 func hasPodReadyCondition(conditions []v1.PodCondition) bool {

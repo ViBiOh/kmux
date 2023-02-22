@@ -75,8 +75,8 @@ func (bp *Pool) handle(us net.Conn, server string) {
 		return
 	}
 
-	go copy(ds, us)
-	go copy(us, ds)
+	go stream(ds, us)
+	go stream(us, ds)
 }
 
 func (bp *Pool) Start(ctx context.Context, localPort uint64) {
@@ -112,7 +112,7 @@ func (bp *Pool) Start(ctx context.Context, localPort uint64) {
 	}
 }
 
-func copy(writer io.WriteCloser, reader io.Reader) {
+func stream(writer io.WriteCloser, reader io.Reader) {
 	defer writer.Close()
 
 	if _, err := io.Copy(writer, reader); err != nil {

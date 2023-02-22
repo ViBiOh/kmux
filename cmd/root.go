@@ -60,8 +60,8 @@ func getKubernetesClient(contexts []string) (client.Array, error) {
 		contexts = append(contexts, "")
 	}
 
-	for _, context := range contexts {
-		kubeClient, err := getKubeClient(configRules, context)
+	for _, ctx := range contexts {
+		kubeClient, err := getKubeClient(configRules, ctx)
 		if err != nil {
 			return clientsArray, err
 		}

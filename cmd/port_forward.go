@@ -127,7 +127,7 @@ var portForwardCmd = &cobra.Command{
 					continue
 				}
 
-				isContainerReady := isForwardPodReady(pod, int32(remotePort))
+				isContainerReady := isForwardPodReady(pod, remotePort)
 
 				forwardStop, ok := activeForwarding.Load(pod.UID)
 				if event.Type == watch.Deleted || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed || !isContainerReady {

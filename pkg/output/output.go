@@ -38,7 +38,7 @@ func Info(prefix, format string, args ...any) {
 }
 
 func Fatal(format string, args ...any) {
-	fmt.Fprint(os.Stderr, Red(fmt.Sprintf(format, args...)))
+	_, _ = fmt.Fprint(os.Stderr, Red(fmt.Sprintf(format, args...)))
 	os.Exit(1)
 }
 
