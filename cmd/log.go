@@ -297,11 +297,32 @@ func outputLog(reader io.Reader, kube client.Kube, name, container string) {
 			continue
 		}
 
-		text = logFilterRegexp.ReplaceAllStringFunc(text, func(value string) string {
-			return output.Red(value)
-		})
+		var greppedText string
+		var currentIndex int
 
-		outputter.Std(text)
+		indexes := logFilterRegexp.FindAllStringIndex(text, -1)
+		for _, index := range indexes {
+			if index[0] != currentIndex {
+				if colorOutputter != nil {
+					greppedText += colorOutputter(text[:(index[0] - currentIndex)])
+				} else {
+					greppedText += text[:(index[0] - currentIndex)]
+				}
+			}
+
+			greppedText += output.Red(text[index[0]:index[1]])
+			currentIndex = index[1]
+		}
+
+		if currentIndex != len(text) {
+			if colorOutputter != nil {
+				greppedText += colorOutputter(text[currentIndex:])
+			} else {
+				greppedText += text[currentIndex:]
+			}
+		}
+
+		outputter.Std(greppedText)
 	}
 }
 
