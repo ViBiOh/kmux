@@ -113,12 +113,12 @@ var logCmd = &cobra.Command{
 			}
 		}
 
-		if levelKey := viper.GetString("levelKey"); len(levelKey) != 0 {
-			jsonColorKeys = append(jsonColorKeys, levelKey)
+		if levelKeys := viper.GetStringSlice("levelKeys"); len(levelKeys) != 0 {
+			jsonColorKeys = append(jsonColorKeys, levelKeys...)
 		}
 
-		if statusCodeKey := viper.GetString("statusCodeKey"); len(statusCodeKey) != 0 {
-			jsonColorKeys = append(jsonColorKeys, statusCodeKey)
+		if statusCodeKeys := viper.GetStringSlice("statusCodeKeys"); len(statusCodeKeys) != 0 {
+			jsonColorKeys = append(jsonColorKeys, statusCodeKeys...)
 		}
 
 		var resourceType, resourceName string
@@ -189,14 +189,14 @@ func initLog() {
 		output.Fatal("bind `grepColor` flag: %s", err)
 	}
 
-	flags.String("levelKey", "level", "Key for level in JSON")
-	if err := viper.BindPFlag("levelKey", flags.Lookup("levelKey")); err != nil {
-		output.Fatal("bind `levelKey` flag: %s", err)
+	flags.StringSlice("levelKeys", []string{"level", "severity"}, "Keys for level in JSON")
+	if err := viper.BindPFlag("levelKeys", flags.Lookup("levelKeys")); err != nil {
+		output.Fatal("bind `levelKeys` flag: %s", err)
 	}
 
-	flags.String("statusCodeKey", "statusCode", "Key for HTTP Status code in JSON")
-	if err := viper.BindPFlag("statusCodeKey", flags.Lookup("statusCodeKey")); err != nil {
-		output.Fatal("bind `statusCodeKey` flag: %s", err)
+	flags.StringSlice("statusCodeKeys", []string{"status", "statusCode", "response_code", "OriginStatus"}, "Keys for HTTP Status code in JSON")
+	if err := viper.BindPFlag("statusCodeKeys", flags.Lookup("statusCodeKeys")); err != nil {
+		output.Fatal("bind `statusCodeKeys` flag: %s", err)
 	}
 }
 
@@ -275,13 +275,12 @@ func outputLog(reader io.Reader, kube client.Kube, name, container string) {
 
 	for streamScanner.Scan() {
 		text := streamScanner.Text()
-		colorIndex = defaultColor
-		colorOutputter = nil
 
 		if strings.HasPrefix(text, "{") && len(jsonColorKeys) > 0 {
-			if colorIndex, colorOutputter = getColorFromJSON(strings.NewReader(text), jsonColorKeys...); colorOutputter != nil {
-				text = colorOutputter(text)
-			}
+			colorIndex, colorOutputter = getColorFromJSON(strings.NewReader(text), jsonColorKeys...)
+		} else {
+			colorIndex = defaultColor
+			colorOutputter = nil
 		}
 
 		if colorIndex > logColorFilter {
@@ -289,7 +288,7 @@ func outputLog(reader io.Reader, kube client.Kube, name, container string) {
 		}
 
 		if logFilterRegexp == nil {
-			outputter.Std(text)
+			outputter.Std(formatOutput(text, colorOutputter))
 
 			continue
 		}
@@ -298,32 +297,42 @@ func outputLog(reader io.Reader, kube client.Kube, name, container string) {
 			continue
 		}
 
-		var greppedText string
-		var currentIndex int
-
-		for _, index := range logFilterRegexp.FindAllStringIndex(text, -1) {
-			if index[0] != currentIndex {
-				if colorOutputter != nil {
-					greppedText += colorOutputter(text[:(index[0] - currentIndex)])
-				} else {
-					greppedText += text[:(index[0] - currentIndex)]
-				}
-			}
-
-			greppedText += output.Red(text[index[0]:index[1]])
-			currentIndex = index[1]
-		}
-
-		if currentIndex != len(text) {
-			if colorOutputter != nil {
-				greppedText += colorOutputter(text[currentIndex:])
-			} else {
-				greppedText += text[currentIndex:]
-			}
-		}
-
-		outputter.Std(greppedText)
+		outputter.Std(outputGreppedColor(text, colorIndex, colorOutputter))
 	}
+}
+
+func outputGreppedColor(text string, colorIndex uint, outputter Formatter) string {
+	var greppedText string
+	var currentIndex int
+
+	highlight := output.Red
+	if colorIndex == colorOrder["red"] {
+		highlight = output.Yellow
+	}
+
+	for _, index := range logFilterRegexp.FindAllStringIndex(text, -1) {
+		if index[0] != currentIndex {
+			greppedText += formatOutput(text[currentIndex:index[0]], outputter)
+		}
+
+		greppedText += highlight(text[index[0]:index[1]])
+
+		currentIndex = index[1]
+	}
+
+	if currentIndex != len(text) {
+		greppedText += formatOutput(text[currentIndex:], outputter)
+	}
+
+	return greppedText
+}
+
+func formatOutput(text string, outputter Formatter) string {
+	if outputter == nil {
+		return text
+	}
+
+	return outputter(text)
 }
 
 func isContainerSelected(container v1.Container) bool {

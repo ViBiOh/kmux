@@ -22,7 +22,7 @@ curl \
   --location \
   --max-time 300 \
   --output "/usr/local/bin/kmux"
-  https://github.com/ViBiOh/kmux/releases/download/v0.3.3/kmux_$(uname -s | tr "[:upper:]" "[:lower:]")_amd64
+  https://github.com/ViBiOh/kmux/releases/download/v0.4.0/kmux_$(uname -s | tr "[:upper:]" "[:lower:]")_amd64
 chmod +x "/usr/local/bin/kmux"
 ```
 
@@ -81,12 +81,12 @@ Flags:
   -c, --containers strings        Filter container's name, default to all containers, supports regexp
   -d, --dry-run                   Dry-run, print only pods
   -g, --grep string               Regexp to filter log
-      --grepColor string          Get logs only below given color (red < yellow < white < green)
+      --grepColor string          Get logs only above given color (red > yellow > green)
   -h, --help                      help for log
-      --levelKey string           Key for level in JSON (default "level")
+      --levelKeys strings         Keys for level in JSON (default [level,severity])
   -l, --selector stringToString   Labels to filter pods (default [])
   -s, --since duration            Display logs since given duration (default 1h0m0s)
-      --statusCodeKey string      Key for HTTP Status code in JSON (default "statusCode")
+      --statusCodeKeys strings    Keys for HTTP Status code in JSON (default [status,statusCode,response_code,OriginStatus])
 ```
 
 ### `port-forward`

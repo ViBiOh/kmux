@@ -19,7 +19,7 @@ var colorOrder = map[string]uint{
 	"green":  3,
 }
 
-type Formatter func(a ...interface{}) string
+type Formatter func(a ...any) string
 
 func getColorFromJSON(stream io.Reader, keys ...string) (uint, Formatter) {
 	decoder := json.NewDecoder(stream)
