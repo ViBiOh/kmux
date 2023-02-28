@@ -276,6 +276,7 @@ func outputLog(reader io.Reader, kube client.Kube, name, container string) {
 	for streamScanner.Scan() {
 		text := streamScanner.Text()
 		colorIndex = defaultColor
+		colorOutputter = nil
 
 		if strings.HasPrefix(text, "{") && len(jsonColorKeys) > 0 {
 			if colorIndex, colorOutputter = getColorFromJSON(strings.NewReader(text), jsonColorKeys...); colorOutputter != nil {
@@ -300,8 +301,7 @@ func outputLog(reader io.Reader, kube client.Kube, name, container string) {
 		var greppedText string
 		var currentIndex int
 
-		indexes := logFilterRegexp.FindAllStringIndex(text, -1)
-		for _, index := range indexes {
+		for _, index := range logFilterRegexp.FindAllStringIndex(text, -1) {
 			if index[0] != currentIndex {
 				if colorOutputter != nil {
 					greppedText += colorOutputter(text[:(index[0] - currentIndex)])
