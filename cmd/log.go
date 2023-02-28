@@ -194,7 +194,7 @@ func initLog() {
 		output.Fatal("bind `levelKeys` flag: %s", err)
 	}
 
-	flags.StringSlice("statusCodeKeys", []string{"status", "statusCode", "response_code", "OriginStatus"}, "Keys for HTTP Status code in JSON")
+	flags.StringSlice("statusCodeKeys", []string{"status", "statusCode", "response_code", "http_status", "OriginStatus"}, "Keys for HTTP Status code in JSON")
 	if err := viper.BindPFlag("statusCodeKeys", flags.Lookup("statusCodeKeys")); err != nil {
 		output.Fatal("bind `statusCodeKeys` flag: %s", err)
 	}
