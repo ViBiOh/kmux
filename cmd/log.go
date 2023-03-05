@@ -147,7 +147,7 @@ var logCmd = &cobra.Command{
 
 				streamCancel, ok := activeStreams.Load(pod.UID)
 
-				if event.Type == watch.Deleted || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
+				if event.Type == watch.Deleted || event.Type == watch.Error || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
 					if ok {
 						streamCancel.(context.CancelFunc)()
 						activeStreams.Delete(pod.UID)
