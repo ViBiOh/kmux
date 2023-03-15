@@ -24,7 +24,9 @@ import (
 )
 
 var (
-	dryRun         bool
+	dryRun    bool
+	rawOutput bool
+
 	since          time.Duration
 	sinceSeconds   int64
 	containers     []string
@@ -179,7 +181,10 @@ func initLog() {
 
 	flags.DurationVarP(&since, "since", "s", time.Hour, "Display logs since given duration")
 	flags.StringSliceVarP(&containers, "containers", "c", nil, "Filter container's name, default to all containers, supports regexp")
+
 	flags.BoolVarP(&dryRun, "dry-run", "d", false, "Dry-run, print only pods")
+	flags.BoolVarP(&rawOutput, "raw-output", "r", false, "Raw ouput, don't print context or pod prefixes")
+
 	flags.StringToStringVarP(&labelsSelector, "selector", "l", nil, "Labels to filter pods")
 
 	flags.StringVarP(&logFilter, "grep", "g", "", "Regexp to filter log")
@@ -262,10 +267,12 @@ func streamPod(ctx context.Context, kube client.Kube, namespace, name, container
 }
 
 func outputLog(reader io.Reader, kube client.Kube, name, container string) {
-	outputter := kube.Child(output.Green(fmt.Sprintf("[%s/%s]", name, container)))
+	outputter := kube.Child(rawOutput, output.Green(fmt.Sprintf("[%s/%s]", name, container)))
 
-	outputter.Info(output.Yellow("Log..."))
-	defer outputter.Info(output.Yellow("Log ended."))
+	if !rawOutput {
+		outputter.Info(output.Yellow("Log..."))
+		defer outputter.Info(output.Yellow("Log ended."))
+	}
 
 	streamScanner := bufio.NewScanner(reader)
 	streamScanner.Split(bufio.ScanLines)

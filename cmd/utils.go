@@ -3,8 +3,6 @@ package cmd
 import (
 	"os"
 	"os/signal"
-
-	"github.com/ViBiOh/kmux/pkg/output"
 )
 
 func waitForEnd(signals ...os.Signal) {
@@ -14,6 +12,5 @@ func waitForEnd(signals ...os.Signal) {
 	signal.Notify(signalsChan, signals...)
 	defer signal.Stop(signalsChan)
 
-	sig := <-signalsChan
-	output.Warn("", "Signal %s received!", sig)
+	<-signalsChan
 }

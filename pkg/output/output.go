@@ -79,8 +79,10 @@ func (o Outputter) Info(format string, args ...any) {
 	Info(o.prefix, format, args...)
 }
 
-func (o Outputter) Child(prefix string) Outputter {
-	if len(prefix) != 0 {
+func (o Outputter) Child(noPrefix bool, prefix string) Outputter {
+	if noPrefix {
+		o.prefix = ""
+	} else if len(prefix) != 0 {
 		o.prefix += prefix + " "
 	}
 

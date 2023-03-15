@@ -84,9 +84,10 @@ Flags:
       --grepColor string          Get logs only above given color (red > yellow > green)
   -h, --help                      help for log
       --levelKeys strings         Keys for level in JSON (default [level,severity])
+  -r, --raw-output                Raw ouput, don't print context or pod prefixes
   -l, --selector stringToString   Labels to filter pods (default [])
   -s, --since duration            Display logs since given duration (default 1h0m0s)
-      --statusCodeKeys strings    Keys for HTTP Status code in JSON (default [status,statusCode,response_code,OriginStatus])
+      --statusCodeKeys strings    Keys for HTTP Status code in JSON (default [status,statusCode,response_code,http_status,OriginStatus])
 ```
 
 ### `port-forward`
