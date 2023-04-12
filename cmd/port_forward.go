@@ -256,7 +256,7 @@ func handleForwardPod(kube client.Kube, activeForwarding *sync.Map, forwarding *
 
 		backend := fmt.Sprintf("127.0.0.1:%d", port)
 
-		kube.Std("Forwarding from %s to %s...", output.Blue(backend), output.Green(fmt.Sprintf("%s:%d", pod.Name, remotePort)))
+		kube.Std("Forwarding from %s to %s...", output.Blue.Sprint(backend), output.Green.Sprintf("%s:%d", pod.Name, remotePort))
 		if dryRun {
 			return
 		}

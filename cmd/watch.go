@@ -178,7 +178,7 @@ func outputWatch(watchTable *table.Table, contextName string, pod v1.Pod) {
 	var content []table.Cell
 
 	if len(contextName) != 0 {
-		content = append(content, table.NewCellColor(contextName, output.RawBlue))
+		content = append(content, table.NewCellColor(contextName, output.Blue))
 	}
 
 	if allNamespace {
@@ -205,9 +205,9 @@ func outputWatch(watchTable *table.Table, contextName string, pod v1.Pod) {
 	var readyColor *color.Color
 	total := len(pod.Status.ContainerStatuses)
 	if ready != uint(total) {
-		readyColor = output.RawYellow
+		readyColor = output.Yellow
 	} else {
-		readyColor = output.RawGreen
+		readyColor = output.Green
 	}
 
 	content = append(content,
@@ -215,7 +215,7 @@ func outputWatch(watchTable *table.Table, contextName string, pod v1.Pod) {
 		table.NewCellColor(fmt.Sprintf("%d/%d", ready, total), readyColor),
 		getPhaseCell(phase),
 		table.NewCell(since),
-		table.NewCellColor(restartText, output.RawMagenta),
+		table.NewCellColor(restartText, output.Magenta),
 	)
 
 	if outputFormat == "wide" {
@@ -234,15 +234,15 @@ func outputWatch(watchTable *table.Table, contextName string, pod v1.Pod) {
 func getPhaseCell(phase string) table.Cell {
 	switch phase {
 	case string(v1.PodRunning), string(v1.PodSucceeded), "Completed":
-		return table.NewCellColor(phase, output.RawGreen)
+		return table.NewCellColor(phase, output.Green)
 	case string(v1.PodFailed), "CrashLoopBackOff", "ImagePullBackOff", "Error":
-		return table.NewCellColor(phase, output.RawRed)
+		return table.NewCellColor(phase, output.Red)
 	case string(v1.PodPending), "ContainerCreating":
-		return table.NewCellColor(phase, output.RawCyan)
+		return table.NewCellColor(phase, output.Cyan)
 	case "Terminated", "Terminating":
-		return table.NewCellColor(phase, output.RawBlue)
+		return table.NewCellColor(phase, output.Blue)
 	default:
-		return table.NewCellColor(phase, output.RawYellow)
+		return table.NewCellColor(phase, output.Yellow)
 	}
 }
 

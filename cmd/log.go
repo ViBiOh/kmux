@@ -15,8 +15,10 @@ import (
 
 	"github.com/ViBiOh/kmux/pkg/client"
 	"github.com/ViBiOh/kmux/pkg/concurrent"
+	"github.com/ViBiOh/kmux/pkg/log"
 	"github.com/ViBiOh/kmux/pkg/output"
 	"github.com/ViBiOh/kmux/pkg/resource"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	v1 "k8s.io/api/core/v1"
@@ -37,9 +39,9 @@ var (
 
 	jsonColorKeys []string
 
-	logFilter       string
-	logColorFilter  uint = 64
-	logFilterRegexp *regexp.Regexp
+	logFilter      string
+	logColorFilter *color.Color
+	logRegexp      *regexp.Regexp
 )
 
 var logCmd = &cobra.Command{
@@ -103,16 +105,14 @@ var logCmd = &cobra.Command{
 		if len(logFilter) > 0 {
 			var err error
 
-			logFilterRegexp, err = regexp.Compile(logFilter)
+			logRegexp, err = regexp.Compile(logFilter)
 			if err != nil {
 				return fmt.Errorf("log filter compile: %w", err)
 			}
 		}
 
 		if grepColor := viper.GetString("grepColor"); len(grepColor) != 0 {
-			if value, ok := colorOrder[strings.ToLower(grepColor)]; ok {
-				logColorFilter = value
-			}
+			logColorFilter = log.ColorFromName(strings.ToLower(grepColor))
 		}
 
 		if levelKeys := viper.GetStringSlice("levelKeys"); len(levelKeys) != 0 {
@@ -214,7 +214,7 @@ func handleLogPod(ctx context.Context, activeStreams *sync.Map, streaming *concu
 		container := container
 
 		if dryRun {
-			kube.Info("%s %s", output.Green(fmt.Sprintf("[%s/%s]", pod.Name, container.Name)), output.Yellow("Found!"))
+			kube.Info("%s %s", output.Green.Sprintf("[%s/%s]", pod.Name, container.Name), output.Yellow.Sprint("Found!"))
 			continue
 		}
 
@@ -231,6 +231,26 @@ func handleLogPod(ctx context.Context, activeStreams *sync.Map, streaming *concu
 			streamPod(streamCtx, kube, pod.Namespace, pod.Name, container.Name)
 		})
 	}
+}
+
+func isContainerSelected(container v1.Container) bool {
+	if len(containers) == 0 {
+		return true
+	}
+
+	for _, containerRegexp := range containersRegexp {
+		if containerRegexp.MatchString(container.Name) {
+			return true
+		}
+	}
+
+	for _, containerName := range containersName {
+		if strings.EqualFold(containerName, container.Name) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func logPod(ctx context.Context, kube client.Kube, namespace, name, container string) {
@@ -267,97 +287,37 @@ func streamPod(ctx context.Context, kube client.Kube, namespace, name, container
 }
 
 func outputLog(reader io.Reader, kube client.Kube, name, container string) {
-	outputter := kube.Child(rawOutput, output.Green(fmt.Sprintf("[%s/%s]", name, container)))
+	outputter := kube.Child(rawOutput, output.Green.Sprintf("[%s/%s]", name, container))
 
 	if !rawOutput {
-		outputter.Info(output.Yellow("Log..."))
-		defer outputter.Info(output.Yellow("Log ended."))
+		outputter.Info(output.Yellow.Sprint("Log..."))
+		defer outputter.Info(output.Yellow.Sprint("Log ended."))
 	}
 
 	streamScanner := bufio.NewScanner(reader)
 	streamScanner.Split(bufio.ScanLines)
 
-	var colorIndex uint
-	var colorOutputter Formatter
+	var colorOutputter *color.Color
 
 	for streamScanner.Scan() {
 		text := streamScanner.Text()
 
-		if strings.HasPrefix(text, "{") && len(jsonColorKeys) > 0 {
-			colorIndex, colorOutputter = getColorFromJSON(strings.NewReader(text), jsonColorKeys...)
-		} else {
-			colorIndex = defaultColor
-			colorOutputter = nil
-		}
+		colorOutputter = log.ColorOfJSON(text, jsonColorKeys...)
 
-		if colorIndex > logColorFilter {
+		if log.ColorIsGreater(colorOutputter, logColorFilter) {
 			continue
 		}
 
-		if logFilterRegexp == nil {
-			outputter.Std(formatOutput(text, colorOutputter))
+		if logRegexp == nil {
+			outputter.Std(log.Format(text, colorOutputter))
 
 			continue
 		}
 
-		if !logFilterRegexp.MatchString(text) {
+		if !logRegexp.MatchString(text) {
 			continue
 		}
 
-		outputter.Std(outputGreppedColor(text, colorIndex, colorOutputter))
+		outputter.Std(log.FormatGrep(text, logRegexp, colorOutputter))
 	}
-}
-
-func outputGreppedColor(text string, colorIndex uint, outputter Formatter) string {
-	var greppedText string
-	var currentIndex int
-
-	highlight := output.Red
-	if colorIndex == colorOrder["red"] {
-		highlight = output.Yellow
-	}
-
-	for _, index := range logFilterRegexp.FindAllStringIndex(text, -1) {
-		if index[0] != currentIndex {
-			greppedText += formatOutput(text[currentIndex:index[0]], outputter)
-		}
-
-		greppedText += highlight(text[index[0]:index[1]])
-
-		currentIndex = index[1]
-	}
-
-	if currentIndex != len(text) {
-		greppedText += formatOutput(text[currentIndex:], outputter)
-	}
-
-	return greppedText
-}
-
-func formatOutput(text string, outputter Formatter) string {
-	if outputter == nil {
-		return text
-	}
-
-	return outputter(text)
-}
-
-func isContainerSelected(container v1.Container) bool {
-	if len(containers) == 0 {
-		return true
-	}
-
-	for _, containerRegexp := range containersRegexp {
-		if containerRegexp.MatchString(container.Name) {
-			return true
-		}
-	}
-
-	for _, containerName := range containersName {
-		if strings.EqualFold(containerName, container.Name) {
-			return true
-		}
-	}
-
-	return false
 }
