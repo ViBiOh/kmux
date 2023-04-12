@@ -30,11 +30,9 @@ var (
 	rawOutput bool
 
 	since          time.Duration
-	sinceSeconds   int64
 	containers     []string
 	labelsSelector map[string]string
 
-	containersName   []string
 	containersRegexp []*regexp.Regexp
 
 	jsonColorKeys []string
@@ -91,15 +89,13 @@ var logCmd = &cobra.Command{
 			cancel()
 		}()
 
-		sinceSeconds = int64(since.Seconds())
-
 		for _, container := range containers {
 			re, err := regexp.Compile(container)
-			if err == nil {
-				containersRegexp = append(containersRegexp, re)
-			} else {
-				containersName = append(containersName, container)
+			if err != nil {
+				return fmt.Errorf("container filter compile: %w", err)
 			}
+
+			containersRegexp = append(containersRegexp, re)
 		}
 
 		if len(logFilter) > 0 {
@@ -129,6 +125,8 @@ var logCmd = &cobra.Command{
 			resourceName = args[1]
 		}
 
+		sinceSeconds := int64(since.Seconds())
+
 		clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
 			podWatcher, err := resource.WatchPods(ctx, kube, resourceType, resourceName, labelsSelector, dryRun)
 			if err != nil {
@@ -154,7 +152,7 @@ var logCmd = &cobra.Command{
 						streamCancel.(context.CancelFunc)()
 						activeStreams.Delete(pod.UID)
 					} else if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
-						handleLogPod(ctx, &activeStreams, streaming, kube, *pod)
+						handleLogPod(ctx, &activeStreams, streaming, kube, *pod, sinceSeconds)
 					}
 
 					continue
@@ -164,7 +162,7 @@ var logCmd = &cobra.Command{
 					continue
 				}
 
-				handleLogPod(ctx, &activeStreams, streaming, kube, *pod)
+				handleLogPod(ctx, &activeStreams, streaming, kube, *pod, sinceSeconds)
 			}
 
 			streaming.Wait()
@@ -180,7 +178,7 @@ func initLog() {
 	flags := logCmd.Flags()
 
 	flags.DurationVarP(&since, "since", "s", time.Hour, "Display logs since given duration")
-	flags.StringSliceVarP(&containers, "containers", "c", nil, "Filter container's name, default to all containers, supports regexp")
+	flags.StringSliceVarP(&containers, "containers", "c", nil, "Filter container's name by regexp, default to all containers")
 
 	flags.BoolVarP(&dryRun, "dry-run", "d", false, "Dry-run, print only pods")
 	flags.BoolVarP(&rawOutput, "raw-output", "r", false, "Raw ouput, don't print context or pod prefixes")
@@ -205,7 +203,7 @@ func initLog() {
 	}
 }
 
-func handleLogPod(ctx context.Context, activeStreams *sync.Map, streaming *concurrent.Simple, kube client.Kube, pod v1.Pod) {
+func handleLogPod(ctx context.Context, activeStreams *sync.Map, streaming *concurrent.Simple, kube client.Kube, pod v1.Pod, since int64) {
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		if !isContainerSelected(container) {
 			continue
@@ -220,7 +218,7 @@ func handleLogPod(ctx context.Context, activeStreams *sync.Map, streaming *concu
 
 		streaming.Go(func() {
 			if pod.Status.Phase != v1.PodRunning {
-				logPod(ctx, kube, pod.Namespace, pod.Name, container.Name)
+				logPod(ctx, kube, pod.Namespace, pod.Name, container.Name, since)
 				return
 			}
 
@@ -228,7 +226,7 @@ func handleLogPod(ctx context.Context, activeStreams *sync.Map, streaming *concu
 			activeStreams.Store(pod.UID, streamCancel)
 			defer streamCancel()
 
-			streamPod(streamCtx, kube, pod.Namespace, pod.Name, container.Name)
+			streamPod(streamCtx, kube, pod.Namespace, pod.Name, container.Name, since)
 		})
 	}
 }
@@ -244,18 +242,12 @@ func isContainerSelected(container v1.Container) bool {
 		}
 	}
 
-	for _, containerName := range containersName {
-		if strings.EqualFold(containerName, container.Name) {
-			return true
-		}
-	}
-
 	return false
 }
 
-func logPod(ctx context.Context, kube client.Kube, namespace, name, container string) {
+func logPod(ctx context.Context, kube client.Kube, namespace, name, container string, since int64) {
 	content, err := kube.CoreV1().Pods(namespace).GetLogs(name, &v1.PodLogOptions{
-		SinceSeconds: &sinceSeconds,
+		SinceSeconds: &since,
 		Container:    container,
 	}).DoRaw(ctx)
 	if err != nil {
@@ -266,10 +258,10 @@ func logPod(ctx context.Context, kube client.Kube, namespace, name, container st
 	outputLog(bytes.NewReader(content), kube, name, container)
 }
 
-func streamPod(ctx context.Context, kube client.Kube, namespace, name, container string) {
+func streamPod(ctx context.Context, kube client.Kube, namespace, name, container string, since int64) {
 	stream, err := kube.CoreV1().Pods(namespace).GetLogs(name, &v1.PodLogOptions{
 		Follow:       true,
-		SinceSeconds: &sinceSeconds,
+		SinceSeconds: &since,
 		Container:    container,
 	}).Stream(ctx)
 	if err != nil {
