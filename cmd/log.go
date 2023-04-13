@@ -1,28 +1,20 @@
 package cmd
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"regexp"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
-	"github.com/ViBiOh/kmux/pkg/client"
-	"github.com/ViBiOh/kmux/pkg/concurrent"
 	"github.com/ViBiOh/kmux/pkg/log"
 	"github.com/ViBiOh/kmux/pkg/output"
 	"github.com/ViBiOh/kmux/pkg/resource"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 var (
@@ -30,10 +22,10 @@ var (
 	rawOutput bool
 
 	since          time.Duration
-	containers     []string
 	labelsSelector map[string]string
 
-	containersRegexp []*regexp.Regexp
+	container       string
+	containerRegexp *regexp.Regexp
 
 	jsonColorKeys []string
 
@@ -89,16 +81,16 @@ var logCmd = &cobra.Command{
 			cancel()
 		}()
 
-		for _, container := range containers {
-			re, err := regexp.Compile(container)
+		if len(container) != 0 {
+			var err error
+
+			containerRegexp, err = regexp.Compile(container)
 			if err != nil {
 				return fmt.Errorf("container filter compile: %w", err)
 			}
-
-			containersRegexp = append(containersRegexp, re)
 		}
 
-		if len(logFilter) > 0 {
+		if len(logFilter) != 0 {
 			var err error
 
 			logRegexp, err = regexp.Compile(logFilter)
@@ -125,50 +117,15 @@ var logCmd = &cobra.Command{
 			resourceName = args[1]
 		}
 
-		sinceSeconds := int64(since.Seconds())
+		logger := log.NewLogger(resourceType, resourceName, labelsSelector, since).
+			WithDryRun(dryRun).
+			WithContainerRegexp(containerRegexp).
+			WithLogRegexp(logRegexp).
+			WithColorFilter(logColorFilter).
+			WithJsonColorKeys(jsonColorKeys).
+			WithRawOutput(rawOutput)
 
-		clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
-			podWatcher, err := resource.WatchPods(ctx, kube, resourceType, resourceName, labelsSelector, dryRun)
-			if err != nil {
-				return fmt.Errorf("watch pods: %w", err)
-			}
-
-			defer podWatcher.Stop()
-
-			var activeStreams sync.Map
-
-			streaming := concurrent.NewSimple()
-
-			for event := range podWatcher.ResultChan() {
-				pod, ok := event.Object.(*v1.Pod)
-				if !ok {
-					continue
-				}
-
-				streamCancel, ok := activeStreams.Load(pod.UID)
-
-				if event.Type == watch.Deleted || event.Type == watch.Error || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
-					if ok {
-						streamCancel.(context.CancelFunc)()
-						activeStreams.Delete(pod.UID)
-					} else if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
-						handleLogPod(ctx, &activeStreams, streaming, kube, *pod, sinceSeconds)
-					}
-
-					continue
-				}
-
-				if ok || pod.Status.Phase == v1.PodPending {
-					continue
-				}
-
-				handleLogPod(ctx, &activeStreams, streaming, kube, *pod, sinceSeconds)
-			}
-
-			streaming.Wait()
-
-			return nil
-		})
+		clients.Execute(ctx, logger.Log)
 
 		return nil
 	},
@@ -178,7 +135,7 @@ func initLog() {
 	flags := logCmd.Flags()
 
 	flags.DurationVarP(&since, "since", "s", time.Hour, "Display logs since given duration")
-	flags.StringSliceVarP(&containers, "containers", "c", nil, "Filter container's name by regexp, default to all containers")
+	flags.StringVarP(&container, "containers", "c", "", "Filter container's name by regexp, default to all containers")
 
 	flags.BoolVarP(&dryRun, "dry-run", "d", false, "Dry-run, print only pods")
 	flags.BoolVarP(&rawOutput, "raw-output", "r", false, "Raw ouput, don't print context or pod prefixes")
@@ -200,116 +157,5 @@ func initLog() {
 	flags.StringSlice("statusCodeKeys", []string{"status", "statusCode", "response_code", "http_status", "OriginStatus"}, "Keys for HTTP Status code in JSON")
 	if err := viper.BindPFlag("statusCodeKeys", flags.Lookup("statusCodeKeys")); err != nil {
 		output.Fatal("bind `statusCodeKeys` flag: %s", err)
-	}
-}
-
-func handleLogPod(ctx context.Context, activeStreams *sync.Map, streaming *concurrent.Simple, kube client.Kube, pod v1.Pod, since int64) {
-	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		if !isContainerSelected(container) {
-			continue
-		}
-
-		container := container
-
-		if dryRun {
-			kube.Info("%s %s", output.Green.Sprintf("[%s/%s]", pod.Name, container.Name), output.Yellow.Sprint("Found!"))
-			continue
-		}
-
-		streaming.Go(func() {
-			if pod.Status.Phase != v1.PodRunning {
-				logPod(ctx, kube, pod.Namespace, pod.Name, container.Name, since)
-				return
-			}
-
-			streamCtx, streamCancel := context.WithCancel(ctx)
-			activeStreams.Store(pod.UID, streamCancel)
-			defer streamCancel()
-
-			streamPod(streamCtx, kube, pod.Namespace, pod.Name, container.Name, since)
-		})
-	}
-}
-
-func isContainerSelected(container v1.Container) bool {
-	if len(containers) == 0 {
-		return true
-	}
-
-	for _, containerRegexp := range containersRegexp {
-		if containerRegexp.MatchString(container.Name) {
-			return true
-		}
-	}
-
-	return false
-}
-
-func logPod(ctx context.Context, kube client.Kube, namespace, name, container string, since int64) {
-	content, err := kube.CoreV1().Pods(namespace).GetLogs(name, &v1.PodLogOptions{
-		SinceSeconds: &since,
-		Container:    container,
-	}).DoRaw(ctx)
-	if err != nil {
-		kube.Err("%s", err)
-		return
-	}
-
-	outputLog(bytes.NewReader(content), kube, name, container)
-}
-
-func streamPod(ctx context.Context, kube client.Kube, namespace, name, container string, since int64) {
-	stream, err := kube.CoreV1().Pods(namespace).GetLogs(name, &v1.PodLogOptions{
-		Follow:       true,
-		SinceSeconds: &since,
-		Container:    container,
-	}).Stream(ctx)
-	if err != nil {
-		kube.Err("%s", err)
-		return
-	}
-
-	defer func() {
-		if closeErr := stream.Close(); closeErr != nil {
-			kube.Err("close stream: %s", closeErr)
-		}
-	}()
-
-	outputLog(stream, kube, name, container)
-}
-
-func outputLog(reader io.Reader, kube client.Kube, name, container string) {
-	outputter := kube.Child(rawOutput, output.Green.Sprintf("[%s/%s]", name, container))
-
-	if !rawOutput {
-		outputter.Info(output.Yellow.Sprint("Log..."))
-		defer outputter.Info(output.Yellow.Sprint("Log ended."))
-	}
-
-	streamScanner := bufio.NewScanner(reader)
-	streamScanner.Split(bufio.ScanLines)
-
-	var colorOutputter *color.Color
-
-	for streamScanner.Scan() {
-		text := streamScanner.Text()
-
-		colorOutputter = log.ColorOfJSON(text, jsonColorKeys...)
-
-		if log.ColorIsGreater(colorOutputter, logColorFilter) {
-			continue
-		}
-
-		if logRegexp == nil {
-			outputter.Std(log.Format(text, colorOutputter))
-
-			continue
-		}
-
-		if !logRegexp.MatchString(text) {
-			continue
-		}
-
-		outputter.Std(log.FormatGrep(text, logRegexp, colorOutputter))
 	}
 }
