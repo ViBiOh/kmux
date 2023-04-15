@@ -32,7 +32,7 @@ func ColorFromName(name string) *color.Color {
 	return nil
 }
 
-func ColorIsGreater(first, second *color.Color) bool {
+func colorIsGreater(first, second *color.Color) bool {
 	if first == nil {
 		return true
 	}
