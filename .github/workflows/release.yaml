@@ -56,6 +56,7 @@ jobs:
         run: |
           curl --disable --silent --show-error --location --max-time 30 "https://raw.githubusercontent.com/ViBiOh/scripts/main/bootstrap" | bash -s -- "-c" "release"
           export GIT_TAG="$(basename ${{ github.ref }})"
+          export GO_VERSION_PATH="github.com/ViBiOh/kmux/cmd.Version"
           scripts/release build assets clean
       - name: Docker
         if: ${{ env.docker_user != '' }}
