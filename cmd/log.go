@@ -29,7 +29,9 @@ var (
 
 	jsonColorKeys []string
 
-	logFilter      string
+	logFilter  string
+	invertGrep bool
+
 	logColorFilter *color.Color
 	logRegexp      *regexp.Regexp
 )
@@ -121,6 +123,7 @@ var logCmd = &cobra.Command{
 			WithDryRun(dryRun).
 			WithContainerRegexp(containerRegexp).
 			WithLogRegexp(logRegexp).
+			WithInvertRegexp(invertGrep).
 			WithColorFilter(logColorFilter).
 			WithJsonColorKeys(jsonColorKeys).
 			WithRawOutput(rawOutput)
@@ -143,6 +146,7 @@ func initLog() {
 	flags.StringToStringVarP(&labelsSelector, "selector", "l", nil, "Labels to filter pods")
 
 	flags.StringVarP(&logFilter, "grep", "g", "", "Regexp to filter log")
+	flags.BoolVarP(&invertGrep, "invert-match", "v", false, "Invert regexp filter matching")
 
 	flags.String("grepColor", "", "Get logs only above given color (red > yellow > green)")
 	if err := viper.BindPFlag("grepColor", flags.Lookup("grepColor")); err != nil {

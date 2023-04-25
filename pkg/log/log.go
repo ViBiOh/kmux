@@ -30,6 +30,7 @@ type Logger struct {
 	since           int64
 	rawOutput       bool
 	dryRun          bool
+	invertRegexp    bool
 }
 
 func NewLogger(resourceType, resourceName string, selector map[string]string, since time.Duration) Logger {
@@ -55,6 +56,12 @@ func (l Logger) WithContainerRegexp(containerRegexp *regexp.Regexp) Logger {
 
 func (l Logger) WithLogRegexp(logRegexp *regexp.Regexp) Logger {
 	l.logRegexp = logRegexp
+
+	return l
+}
+
+func (l Logger) WithInvertRegexp(invertRegexp bool) Logger {
+	l.invertRegexp = invertRegexp
 
 	return l
 }
@@ -219,7 +226,7 @@ func (l Logger) outputLog(kube client.Kube, reader io.Reader, outputter output.O
 			continue
 		}
 
-		if !l.logRegexp.MatchString(text) {
+		if match := l.logRegexp.MatchString(text); (match && l.invertRegexp) || (!l.invertRegexp && !match) {
 			continue
 		}
 
