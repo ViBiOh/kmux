@@ -43,6 +43,15 @@ func PodTemplateGetter(ctx context.Context, kube client.Kube, resourceType, reso
 		}
 
 		return item.Spec.Template, nil
+
+	case "rs", "replicaset", "replicasets":
+		item, err := kube.AppsV1().ReplicaSets(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
+		if err != nil {
+			return v1.PodTemplateSpec{}, err
+		}
+
+		return item.Spec.Template, nil
+
 	case "sts", "statefulset", "statefulsets":
 		item, err := kube.AppsV1().StatefulSets(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
 		if err != nil {

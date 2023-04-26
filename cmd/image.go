@@ -21,6 +21,7 @@ var imageCmd = &cobra.Command{
 				"daemonsets",
 				"deployments",
 				"jobs",
+				"replicasets",
 				"statefulsets",
 			}, cobra.ShellCompDirectiveNoFileComp
 		}
