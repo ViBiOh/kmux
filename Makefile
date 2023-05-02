@@ -86,3 +86,9 @@ build:
 .PHONY: run
 run:
 	$(MAIN_RUNNER)
+
+## release: Create a release
+.PHONY: release
+release:
+	go install "github.com/goreleaser/goreleaser@latest"
+	goreleaser build --clean --snapshot

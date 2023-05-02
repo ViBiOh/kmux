@@ -14,12 +14,9 @@ permissions:
   security-events: none
 
 on:
-  release:
-    types:
-      - released
-
-env:
-  SCRIPTS_NO_INTERACTIVE: "true"
+  push:
+    tags:
+      - "*"
 
 defaults:
   run:
@@ -31,17 +28,21 @@ jobs:
     runs-on: ubuntu-latest
     env:
       gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-      docker_user: ${{ secrets.DOCKER_USER }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - run: git fetch --force --tags
+
       - name: Setup Golang
         uses: actions/setup-go@v4
         with:
           go-version: "^1.20"
           cache: true
-      - name: Build
-        run: make init
+
       - name: GPG
         id: import_gpg
         if: ${{ env.gpg_private_key != '' }}
@@ -49,20 +50,12 @@ jobs:
         with:
           gpg_private_key: ${{ env.gpg_private_key }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
-      - name: Assets
+
+      - uses: goreleaser/goreleaser-action@v4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
-        run: |
-          curl --disable --silent --show-error --location --max-time 30 "https://raw.githubusercontent.com/ViBiOh/scripts/main/bootstrap" | bash -s -- "-c" "release"
-          export GIT_TAG="$(basename ${{ github.ref }})"
-          export GO_VERSION_PATH="github.com/ViBiOh/kmux/cmd.Version"
-          scripts/release build assets clean
-      - name: Docker
-        if: ${{ env.docker_user != '' }}
-        env:
-          DOCKER_USER: ${{ env.docker_user }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
-        run: |
-          curl --disable --silent --show-error --location --max-time 30 "https://raw.githubusercontent.com/ViBiOh/scripts/main/bootstrap" | bash -s -- "-c" "docker_promote"
-          scripts/docker_promote "${{ env.DOCKER_USER }}/$(make name)" "$(make version-date)" "$(basename ${{ github.ref }})"
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --clean

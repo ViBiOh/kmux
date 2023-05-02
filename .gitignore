@@ -5,6 +5,7 @@ scripts/
 .env
 bin/
 release/
+dist/
 coverage.*
 profile.out
 
