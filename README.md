@@ -78,7 +78,7 @@ Aliases:
   log, logs
 
 Flags:
-  -c, --containers string         Filter container's name by regexp, default to all containers
+  -c, --container  string         Filter container's name by regexp, default to all containers
   -d, --dry-run                   Dry-run, print only pods
   -g, --grep string               Regexp to filter log
       --grepColor string          Get logs only above given color (red > yellow > green)
@@ -154,5 +154,6 @@ Usage:
   kmux image TYPE NAME [flags]
 
 Flags:
-  -h, --help   help for image
+  -c, --container string   Filter container's name by regexp, default to all containers
+  -h, --help               help for image
 ```

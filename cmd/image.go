@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"context"
+	"fmt"
+	"regexp"
 	"strings"
 	"syscall"
 
@@ -44,7 +46,7 @@ var imageCmd = &cobra.Command{
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	Args: cobra.MatchAll(cobra.ExactArgs(2), cobra.OnlyValidArgs),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		resourceType := args[0]
 		resourceName := args[1]
 
@@ -56,21 +58,38 @@ var imageCmd = &cobra.Command{
 			cancel()
 		}()
 
+		if len(container) != 0 {
+			var err error
+
+			containerRegexp, err = regexp.Compile(container)
+			if err != nil {
+				return fmt.Errorf("container filter compile: %w", err)
+			}
+		}
+
 		clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
 			podTemplate, err := resource.PodSpecGetter(ctx, kube, resourceType, resourceName)
 			if err != nil {
 				return err
 			}
 
-			for _, container := range podTemplate.InitContainers {
-				kube.Std("%s", container.Image)
-			}
+			for _, container := range append(podTemplate.InitContainers, podTemplate.Containers...) {
+				if !resource.IsContainedSelected(container, containerRegexp) {
+					continue
+				}
 
-			for _, container := range podTemplate.Containers {
 				kube.Std("%s", container.Image)
 			}
 
 			return nil
 		})
+
+		return nil
 	},
+}
+
+func initImage() {
+	flags := imageCmd.Flags()
+
+	flags.StringVarP(&container, "container", "c", "", "Filter container's name by regexp, default to all containers")
 }

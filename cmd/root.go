@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/ViBiOh/kmux/pkg/client"
@@ -20,6 +21,9 @@ import (
 var (
 	clients      client.Array
 	allNamespace bool
+
+	container       string
+	containerRegexp *regexp.Regexp
 )
 
 var rootCmd = &cobra.Command{
@@ -140,8 +144,10 @@ func init() {
 	}
 
 	rootCmd.AddCommand(versionCmd)
-	rootCmd.AddCommand(imageCmd)
 	rootCmd.AddCommand(restartCmd)
+
+	initImage()
+	rootCmd.AddCommand(imageCmd)
 
 	initPortForward()
 	rootCmd.AddCommand(portForwardCmd)

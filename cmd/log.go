@@ -24,9 +24,6 @@ var (
 	since          time.Duration
 	labelsSelector map[string]string
 
-	container       string
-	containerRegexp *regexp.Regexp
-
 	jsonColorKeys []string
 
 	logFilter  string
@@ -138,7 +135,7 @@ func initLog() {
 	flags := logCmd.Flags()
 
 	flags.DurationVarP(&since, "since", "s", time.Hour, "Display logs since given duration")
-	flags.StringVarP(&container, "containers", "c", "", "Filter container's name by regexp, default to all containers")
+	flags.StringVarP(&container, "container", "c", "", "Filter container's name by regexp, default to all containers")
 
 	flags.BoolVarP(&dryRun, "dry-run", "d", false, "Dry-run, print only pods")
 	flags.BoolVarP(&rawOutput, "raw-output", "r", false, "Raw ouput, don't print context or pod prefixes")

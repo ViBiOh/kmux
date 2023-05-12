@@ -129,7 +129,7 @@ func (l Logger) Log(ctx context.Context, kube client.Kube) error {
 
 func (l Logger) handlePod(ctx context.Context, kube client.Kube, activeStreams *sync.Map, streaming *concurrent.Simple, pod v1.Pod) {
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		if !l.isContainerSelected(container) {
+		if !resource.IsContainedSelected(container, l.containerRegexp) {
 			continue
 		}
 
@@ -153,14 +153,6 @@ func (l Logger) handlePod(ctx context.Context, kube client.Kube, activeStreams *
 			l.streamPod(streamCtx, kube, pod.Namespace, pod.Name, container.Name)
 		})
 	}
-}
-
-func (l Logger) isContainerSelected(container v1.Container) bool {
-	if l.containerRegexp == nil {
-		return true
-	}
-
-	return l.containerRegexp.MatchString(container.Name)
 }
 
 func (l Logger) logPod(ctx context.Context, kube client.Kube, namespace, name, container string) {
