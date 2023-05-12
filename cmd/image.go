@@ -21,6 +21,7 @@ var imageCmd = &cobra.Command{
 				"daemonsets",
 				"deployments",
 				"jobs",
+				"pods",
 				"replicasets",
 				"statefulsets",
 			}, cobra.ShellCompDirectiveNoFileComp
@@ -56,16 +57,16 @@ var imageCmd = &cobra.Command{
 		}()
 
 		clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
-			podTemplate, err := resource.PodTemplateGetter(ctx, kube, resourceType, resourceName)
+			podTemplate, err := resource.PodSpecGetter(ctx, kube, resourceType, resourceName)
 			if err != nil {
 				return err
 			}
 
-			for _, container := range podTemplate.Spec.InitContainers {
+			for _, container := range podTemplate.InitContainers {
 				kube.Std("%s", container.Image)
 			}
 
-			for _, container := range podTemplate.Spec.Containers {
+			for _, container := range podTemplate.Containers {
 				kube.Std("%s", container.Image)
 			}
 

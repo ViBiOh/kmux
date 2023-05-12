@@ -26,6 +26,7 @@ func ListerFor(resourceType string) (Lister, error) {
 
 			return output, nil
 		}, nil
+
 	case "ds", "daemonset", "daemonsets":
 		return func(ctx context.Context, kube client.Kube, namespace string, options metav1.ListOptions) ([]metav1.ObjectMeta, error) {
 			items, err := kube.AppsV1().DaemonSets(namespace).List(ctx, options)
@@ -40,6 +41,7 @@ func ListerFor(resourceType string) (Lister, error) {
 
 			return output, nil
 		}, nil
+
 	case "deploy", "deployment", "deployments":
 		return func(ctx context.Context, kube client.Kube, namespace string, options metav1.ListOptions) ([]metav1.ObjectMeta, error) {
 			items, err := kube.AppsV1().Deployments(namespace).List(ctx, options)
@@ -54,6 +56,7 @@ func ListerFor(resourceType string) (Lister, error) {
 
 			return output, nil
 		}, nil
+
 	case "job", "jobs":
 		return func(ctx context.Context, kube client.Kube, namespace string, options metav1.ListOptions) ([]metav1.ObjectMeta, error) {
 			items, err := kube.BatchV1().Jobs(namespace).List(ctx, options)
@@ -68,6 +71,7 @@ func ListerFor(resourceType string) (Lister, error) {
 
 			return output, nil
 		}, nil
+
 	case "po", "pod", "pods":
 		return func(ctx context.Context, kube client.Kube, namespace string, options metav1.ListOptions) ([]metav1.ObjectMeta, error) {
 			items, err := kube.CoreV1().Pods(namespace).List(ctx, options)
@@ -82,6 +86,7 @@ func ListerFor(resourceType string) (Lister, error) {
 
 			return output, nil
 		}, nil
+
 	case "ns", "namespace", "namespaces":
 		return func(ctx context.Context, kube client.Kube, _ string, options metav1.ListOptions) ([]metav1.ObjectMeta, error) {
 			items, err := kube.CoreV1().Namespaces().List(ctx, options)
@@ -96,6 +101,7 @@ func ListerFor(resourceType string) (Lister, error) {
 
 			return output, nil
 		}, nil
+
 	case "no", "node", "nodes":
 		return func(ctx context.Context, kube client.Kube, _ string, options metav1.ListOptions) ([]metav1.ObjectMeta, error) {
 			items, err := kube.CoreV1().Nodes().List(ctx, options)
@@ -110,6 +116,7 @@ func ListerFor(resourceType string) (Lister, error) {
 
 			return output, nil
 		}, nil
+
 	case "svc", "service", "services":
 		return func(ctx context.Context, kube client.Kube, namespace string, options metav1.ListOptions) ([]metav1.ObjectMeta, error) {
 			items, err := kube.CoreV1().Services(namespace).List(ctx, options)
@@ -124,6 +131,7 @@ func ListerFor(resourceType string) (Lister, error) {
 
 			return output, nil
 		}, nil
+
 	case "sts", "statefulset", "statefulsets":
 		return func(ctx context.Context, kube client.Kube, namespace string, options metav1.ListOptions) ([]metav1.ObjectMeta, error) {
 			items, err := kube.AppsV1().StatefulSets(namespace).List(ctx, options)
@@ -138,6 +146,7 @@ func ListerFor(resourceType string) (Lister, error) {
 
 			return output, nil
 		}, nil
+
 	default:
 		return nil, fmt.Errorf("unhandled resource type `%s`", resourceType)
 	}

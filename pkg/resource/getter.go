@@ -13,54 +13,66 @@ import (
 
 type PodFilter func(context.Context, client.Kube, v1.Pod) bool
 
-func PodTemplateGetter(ctx context.Context, kube client.Kube, resourceType, resourceName string) (v1.PodTemplateSpec, error) {
+func PodSpecGetter(ctx context.Context, kube client.Kube, resourceType, resourceName string) (v1.PodSpec, error) {
 	switch resourceType {
 	case "cj", "cronjob", "cronjobs":
 		item, err := kube.BatchV1().CronJobs(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
 		if err != nil {
-			return v1.PodTemplateSpec{}, err
+			return v1.PodSpec{}, err
 		}
 
-		return item.Spec.JobTemplate.Spec.Template, nil
+		return item.Spec.JobTemplate.Spec.Template.Spec, nil
+
 	case "ds", "daemonset", "daemonsets":
 		item, err := kube.AppsV1().DaemonSets(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
 		if err != nil {
-			return v1.PodTemplateSpec{}, err
+			return v1.PodSpec{}, err
 		}
 
-		return item.Spec.Template, nil
+		return item.Spec.Template.Spec, nil
+
 	case "deploy", "deployment", "deployments":
 		item, err := kube.AppsV1().Deployments(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
 		if err != nil {
-			return v1.PodTemplateSpec{}, err
+			return v1.PodSpec{}, err
 		}
 
-		return item.Spec.Template, nil
+		return item.Spec.Template.Spec, nil
+
 	case "job", "jobs":
 		item, err := kube.BatchV1().Jobs(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
 		if err != nil {
-			return v1.PodTemplateSpec{}, err
+			return v1.PodSpec{}, err
 		}
 
-		return item.Spec.Template, nil
+		return item.Spec.Template.Spec, nil
+
+	case "po", "pod", "pods":
+		item, err := kube.CoreV1().Pods(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
+		if err != nil {
+			return v1.PodSpec{}, err
+		}
+
+		return item.Spec, nil
 
 	case "rs", "replicaset", "replicasets":
 		item, err := kube.AppsV1().ReplicaSets(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
 		if err != nil {
-			return v1.PodTemplateSpec{}, err
+			return v1.PodSpec{}, err
 		}
 
-		return item.Spec.Template, nil
+		return item.Spec.Template.Spec, nil
 
 	case "sts", "statefulset", "statefulsets":
 		item, err := kube.AppsV1().StatefulSets(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
 		if err != nil {
-			return v1.PodTemplateSpec{}, err
+			return v1.PodSpec{}, err
 		}
 
-		return item.Spec.Template, nil
+		return item.Spec.Template.Spec, nil
+
 	default:
-		return v1.PodTemplateSpec{}, unhandledError(resourceType)
+		return v1.PodSpec{}, unhandledError(resourceType)
 	}
 }
 
@@ -151,6 +163,7 @@ func podLabelSelectorGetter(ctx context.Context, kube client.Kube, resourceType,
 		}
 
 		return item.Spec.Selector, nil
+
 	case "deploy", "deployment", "deployments":
 		item, err := kube.AppsV1().Deployments(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
 		if err != nil {
@@ -158,6 +171,7 @@ func podLabelSelectorGetter(ctx context.Context, kube client.Kube, resourceType,
 		}
 
 		return item.Spec.Selector, nil
+
 	case "job", "jobs":
 		item, err := kube.BatchV1().Jobs(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
 		if err != nil {
@@ -165,6 +179,7 @@ func podLabelSelectorGetter(ctx context.Context, kube client.Kube, resourceType,
 		}
 
 		return item.Spec.Selector, nil
+
 	case "sts", "statefulset", "statefulsets":
 		item, err := kube.AppsV1().StatefulSets(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
 		if err != nil {
@@ -172,6 +187,7 @@ func podLabelSelectorGetter(ctx context.Context, kube client.Kube, resourceType,
 		}
 
 		return item.Spec.Selector, nil
+
 	default:
 		return nil, unhandledError(resourceType)
 	}
@@ -181,8 +197,10 @@ func podFieldSelectorGetter(resourceType, resourceName string) (string, error) {
 	switch resourceType {
 	case "po", "pod", "pods":
 		return fmt.Sprintf("metadata.name=%s", resourceName), nil
+
 	case "no", "node", "nodes":
 		return fmt.Sprintf("spec.nodeName=%s", resourceName), nil
+
 	default:
 		return "", unhandledError(resourceType)
 	}
