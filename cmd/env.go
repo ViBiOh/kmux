@@ -7,15 +7,15 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/ViBiOh/kmux/pkg/client"
+	"github.com/ViBiOh/kmux/pkg/env"
 	"github.com/ViBiOh/kmux/pkg/resource"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-var imageCmd = &cobra.Command{
-	Use:   "image TYPE NAME",
-	Short: "Get all image names of containers for a given resource",
+var envCmd = &cobra.Command{
+	Use:   "env TYPE NAME",
+	Short: "Get all configured environment variables of containers for a given resource",
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
 			return []string{
@@ -67,29 +67,17 @@ var imageCmd = &cobra.Command{
 			}
 		}
 
-		clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
-			podSpec, err := resource.GetPodSpec(ctx, kube, resourceType, resourceName)
-			if err != nil {
-				return err
-			}
+		envGetter := env.NewEnvGetter(resourceType, resourceName).
+			WithContainerRegexp(containerRegexp)
 
-			for _, container := range append(podSpec.InitContainers, podSpec.Containers...) {
-				if !resource.IsContainedSelected(container, containerRegexp) {
-					continue
-				}
-
-				kube.Std("%s", container.Image)
-			}
-
-			return nil
-		})
+		clients.Execute(ctx, envGetter.Get)
 
 		return nil
 	},
 }
 
-func initImage() {
-	flags := imageCmd.Flags()
+func initEnv() {
+	flags := envCmd.Flags()
 
 	flags.StringVarP(&container, "container", "c", "", "Filter container's name by regexp, default to all containers")
 }

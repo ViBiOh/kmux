@@ -149,6 +149,9 @@ func init() {
 	initImage()
 	rootCmd.AddCommand(imageCmd)
 
+	initEnv()
+	rootCmd.AddCommand(envCmd)
+
 	initPortForward()
 	rootCmd.AddCommand(portForwardCmd)
 

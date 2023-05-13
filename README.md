@@ -157,3 +157,18 @@ Flags:
   -c, --container string   Filter container's name by regexp, default to all containers
   -h, --help               help for image
 ```
+
+### `env`
+
+`env` prints the configured environment variables from the given resource. When a value is dynamic (e.g. `hostIP`, `podIP`, etc.), the value from the most "live" pod is retrieved.
+
+```bash
+Get all configured environment variables of containers for a given resource
+
+Usage:
+  kmux env TYPE NAME [flags]
+
+Flags:
+  -c, --container string   Filter container's name by regexp, default to all containers
+  -h, --help               help for env
+```

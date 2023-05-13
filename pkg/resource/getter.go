@@ -13,7 +13,7 @@ import (
 
 type PodFilter func(context.Context, client.Kube, v1.Pod) bool
 
-func PodSpecGetter(ctx context.Context, kube client.Kube, resourceType, resourceName string) (v1.PodSpec, error) {
+func GetPodSpec(ctx context.Context, kube client.Kube, resourceType, resourceName string) (v1.PodSpec, error) {
 	switch resourceType {
 	case "cj", "cronjob", "cronjobs":
 		item, err := kube.BatchV1().CronJobs(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
@@ -76,7 +76,7 @@ func PodSpecGetter(ctx context.Context, kube client.Kube, resourceType, resource
 	}
 }
 
-func podsGetterConfiguration(ctx context.Context, kube client.Kube, resourceType, resourceName string) (namespace string, options metav1.ListOptions, postListFilter PodFilter, err error) {
+func GetPodsSelector(ctx context.Context, kube client.Kube, resourceType, resourceName string) (namespace string, options metav1.ListOptions, postListFilter PodFilter, err error) {
 	switch resourceType {
 	case "ns", "namespace", "namespaces":
 		namespace = resourceName

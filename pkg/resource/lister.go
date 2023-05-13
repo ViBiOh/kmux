@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ViBiOh/kmux/pkg/client"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -150,4 +151,29 @@ func ListerFor(resourceType string) (Lister, error) {
 	default:
 		return nil, fmt.Errorf("unhandled resource type `%s`", resourceType)
 	}
+}
+
+func ListPods(ctx context.Context, kube client.Kube, resourceType, resourceName string) ([]v1.Pod, error) {
+	namespace, options, filter, err := GetPodsSelector(ctx, kube, resourceType, resourceName)
+	if err != nil {
+		return nil, fmt.Errorf("get pods selector: %w", err)
+	}
+
+	pods, err := kube.CoreV1().Pods(namespace).List(ctx, options)
+	if err != nil {
+		return nil, fmt.Errorf("get pods: %w", err)
+	}
+
+	if filter == nil {
+		return pods.Items, nil
+	}
+
+	var output []v1.Pod
+	for _, pod := range pods.Items {
+		if filter(ctx, kube, pod) {
+			output = append(output, pod)
+		}
+	}
+
+	return output, nil
 }

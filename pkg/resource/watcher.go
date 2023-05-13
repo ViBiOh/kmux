@@ -34,7 +34,7 @@ func WatchPods(ctx context.Context, kube client.Kube, resourceType, resourceName
 	namespace := kube.Namespace
 
 	if len(resourceType) > 0 && len(resourceName) > 0 {
-		namespace, listOptions, postListFilter, err = podsGetterConfiguration(ctx, kube, resourceType, resourceName)
+		namespace, listOptions, postListFilter, err = GetPodsSelector(ctx, kube, resourceType, resourceName)
 		if err != nil {
 			return nil, fmt.Errorf("get list options: %w", err)
 		}
