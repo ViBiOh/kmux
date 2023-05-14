@@ -3,7 +3,9 @@ package env
 import (
 	"context"
 	"fmt"
+	"math"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/ViBiOh/kmux/pkg/client"
@@ -48,12 +50,25 @@ func (eg EnvGetter) Get(ctx context.Context, kube client.Kube) error {
 		return err
 	}
 
+	mostLivePod := getMostLivePod(pods)
+
+	var node v1.Node
+
+	if len(mostLivePod.Spec.NodeName) != 0 {
+		podNode, err := kube.CoreV1().Nodes().Get(ctx, mostLivePod.Spec.NodeName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		node = *podNode
+	}
+
 	for _, container := range append(podSpec.InitContainers, podSpec.Containers...) {
 		if !resource.IsContainedSelected(container, eg.containerRegexp) {
 			continue
 		}
 
-		values := getEnv(ctx, kube, container, getMostLivePod(pods))
+		values := getEnv(ctx, kube, container, mostLivePod, node)
 
 		if len(values) > 0 {
 			containerOutput := &strings.Builder{}
@@ -66,7 +81,7 @@ func (eg EnvGetter) Get(ctx context.Context, kube client.Kube) error {
 				}
 			}
 
-			kube.Info("%s %s", output.Green.Sprintf("[%s]", container.Name), containerOutput.String())
+			kube.Info("%s\n%s", output.Green.Sprintf("[%s]", container.Name), containerOutput.String())
 		}
 	}
 
@@ -107,7 +122,7 @@ func getMostLivePod(pods []v1.Pod) v1.Pod {
 	return v1.Pod{}
 }
 
-func getEnv(ctx context.Context, kube client.Kube, container v1.Container, pod v1.Pod) map[string]map[string]string {
+func getEnv(ctx context.Context, kube client.Kube, container v1.Container, pod v1.Pod, node v1.Node) map[string]map[string]string {
 	output := make(map[string]map[string]string)
 
 	configMaps, secrets := getEnvDependencies(ctx, kube, container)
@@ -129,7 +144,7 @@ func getEnv(ctx context.Context, kube client.Kube, container v1.Container, pod v
 		inline := make(map[string]string)
 
 		for _, env := range container.Env {
-			inline[env.Name] = getInlineEnv(pod, env, configMaps, secrets)
+			inline[env.Name] = getInlineEnv(pod, node, env, configMaps, secrets)
 		}
 
 		output["inline"] = inline
@@ -207,15 +222,15 @@ func getEnvFromSource(storage map[string]map[string]string, kind, prefix, name s
 	return keyName, content
 }
 
-func getInlineEnv(pod v1.Pod, envVar v1.EnvVar, configMaps, secrets map[string]map[string]string) string {
+func getInlineEnv(pod v1.Pod, node v1.Node, envVar v1.EnvVar, configMaps, secrets map[string]map[string]string) string {
 	if len(envVar.Value) > 0 {
 		return envVar.Value
 	}
 
-	return getValueFrom(pod, envVar, configMaps, secrets)
+	return getValueFrom(pod, node, envVar, configMaps, secrets)
 }
 
-func getValueFrom(pod v1.Pod, envVar v1.EnvVar, configMaps, secrets map[string]map[string]string) string {
+func getValueFrom(pod v1.Pod, node v1.Node, envVar v1.EnvVar, configMaps, secrets map[string]map[string]string) string {
 	if envVar.ValueFrom.ConfigMapKeyRef != nil {
 		return getValueFromRef(configMaps, "configmap", envVar.ValueFrom.ConfigMapKeyRef.Name, envVar.ValueFrom.ConfigMapKeyRef.Key, envVar.ValueFrom.ConfigMapKeyRef.Optional)
 	}
@@ -229,7 +244,7 @@ func getValueFrom(pod v1.Pod, envVar v1.EnvVar, configMaps, secrets map[string]m
 	}
 
 	if envVar.ValueFrom.ResourceFieldRef != nil {
-		return getEnvResourceRef(pod.Spec, *envVar.ValueFrom.ResourceFieldRef)
+		return getEnvResourceRef(pod.Spec, node, *envVar.ValueFrom.ResourceFieldRef)
 	}
 
 	return ""
@@ -248,11 +263,11 @@ func getValueFromRef(storage map[string]map[string]string, kind, name, key strin
 
 func getEnvFieldRef(pod v1.Pod, field v1.ObjectFieldSelector) string {
 	if matches := envLabels.FindAllStringSubmatch(field.FieldPath, -1); len(matches) > 0 {
-		return matches[0][1]
+		return pod.Labels[matches[0][1]]
 	}
 
 	if matches := envAnnotations.FindAllStringSubmatch(field.FieldPath, -1); len(matches) > 0 {
-		return matches[0][1]
+		return pod.Annotations[matches[0][1]]
 	}
 
 	switch field.FieldPath {
@@ -287,7 +302,7 @@ func getEnvFieldRef(pod v1.Pod, field v1.ObjectFieldSelector) string {
 	}
 }
 
-func getEnvResourceRef(pod v1.PodSpec, resource v1.ResourceFieldSelector) string {
+func getEnvResourceRef(pod v1.PodSpec, node v1.Node, resource v1.ResourceFieldSelector) string {
 	var container v1.Container
 
 	for _, container = range pod.Containers {
@@ -298,17 +313,68 @@ func getEnvResourceRef(pod v1.PodSpec, resource v1.ResourceFieldSelector) string
 
 	switch resource.Resource {
 	case "limits.cpu":
-		return container.Resources.Limits.Cpu().String()
+		limit := container.Resources.Limits.Cpu().MilliValue()
+		if limit == 0 {
+			limit = node.Status.Capacity.Cpu().MilliValue()
+		}
+
+		return fmt.Sprintf("%.0f", math.Ceil(float64(limit)/float64(resource.Divisor.MilliValue())))
+
 	case "limits.memory":
-		return container.Resources.Limits.Memory().String()
+		limit := container.Resources.Limits.Memory().MilliValue()
+		if limit == 0 {
+			limit = node.Status.Capacity.Memory().MilliValue()
+		}
+
+		return fmt.Sprintf("%.0f", math.Ceil(float64(limit)/float64(resource.Divisor.MilliValue())))
+
 	case "limits.ephemeral-storage":
-		return container.Resources.Limits.StorageEphemeral().String()
+		limit := container.Resources.Limits.StorageEphemeral().MilliValue()
+		if limit == 0 {
+			limit = node.Status.Capacity.StorageEphemeral().MilliValue()
+		}
+
+		return fmt.Sprintf("%.0f", math.Ceil(float64(limit)/float64(resource.Divisor.MilliValue())))
+
 	case "requests.cpu":
-		return container.Resources.Requests.Cpu().String()
+		limit := container.Resources.Limits.Cpu().MilliValue()
+		if limit == 0 {
+			return "0"
+		}
+
+		value := limit / resource.Divisor.MilliValue()
+		if value == 0 {
+			return "1"
+		}
+
+		return strconv.FormatInt(value, 10)
+
 	case "requests.memory":
-		return container.Resources.Requests.Memory().String()
+		limit := container.Resources.Requests.Memory().MilliValue()
+		if limit == 0 {
+			return "0"
+		}
+
+		value := limit / resource.Divisor.MilliValue()
+		if value == 0 {
+			return "1"
+		}
+
+		return strconv.FormatInt(value, 10)
+
 	case "requests.ephemeral-storage":
-		return container.Resources.Requests.StorageEphemeral().String()
+		limit := container.Resources.Requests.StorageEphemeral().MilliValue()
+		if limit == 0 {
+			return "0"
+		}
+
+		value := limit / resource.Divisor.MilliValue()
+		if value == 0 {
+			return "1"
+		}
+
+		return strconv.FormatInt(value, 10)
+
 	default:
 		return ""
 	}
