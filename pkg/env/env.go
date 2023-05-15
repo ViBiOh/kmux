@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -19,6 +20,25 @@ var (
 	envLabels      = regexp.MustCompile(`(?m)metadata\.labels\[["']?(.*?)["']?\]`)
 	envAnnotations = regexp.MustCompile(`(?m)metadata\.annotations\[["']?(.*?)["']?\]`)
 )
+
+type envValue struct {
+	data   map[string]string
+	source string
+}
+
+func (ev envValue) String() string {
+	output := fmt.Sprintf("# %s\n", ev.source)
+
+	entries := make([]string, 0, len(ev.data))
+
+	for key, value := range ev.data {
+		entries = append(entries, fmt.Sprintf("%s=%s\n", key, value))
+	}
+
+	sort.Strings(entries)
+
+	return output + strings.Join(entries, "")
+}
 
 type EnvGetter struct {
 	containerRegexp *regexp.Regexp
@@ -63,26 +83,36 @@ func (eg EnvGetter) Get(ctx context.Context, kube client.Kube) error {
 		node = *podNode
 	}
 
+	var containers []v1.Container
+
 	for _, container := range append(podSpec.InitContainers, podSpec.Containers...) {
 		if !resource.IsContainedSelected(container, eg.containerRegexp) {
 			continue
 		}
 
+		containers = append(containers, container)
+	}
+
+	for _, container := range containers {
 		values := getEnv(ctx, kube, container, mostLivePod, node)
 
-		if len(values) > 0 {
-			containerOutput := &strings.Builder{}
-
-			for source, content := range values {
-				fmt.Fprintf(containerOutput, "# %s\n", source)
-
-				for key, value := range content {
-					fmt.Fprintf(containerOutput, "%s=%s\n", key, value)
-				}
-			}
-
-			kube.Info("%s\n%s", output.Green.Sprintf("[%s]", container.Name), containerOutput.String())
+		if len(values) == 0 {
+			continue
 		}
+
+		containerOutput := &strings.Builder{}
+
+		for _, value := range values {
+			fmt.Fprintf(containerOutput, "%s", value)
+		}
+
+		var outputter output.Outputter
+
+		if len(containers) != 1 {
+			outputter = kube.Outputter.Child(false, output.Green.Sprintf("[%s]", container.Name))
+		}
+
+		outputter.Info(containerOutput.String())
 	}
 
 	return nil
@@ -122,8 +152,8 @@ func getMostLivePod(pods []v1.Pod) v1.Pod {
 	return v1.Pod{}
 }
 
-func getEnv(ctx context.Context, kube client.Kube, container v1.Container, pod v1.Pod, node v1.Node) map[string]map[string]string {
-	output := make(map[string]map[string]string)
+func getEnv(ctx context.Context, kube client.Kube, container v1.Container, pod v1.Pod, node v1.Node) []envValue {
+	var output []envValue
 
 	configMaps, secrets := getEnvDependencies(ctx, kube, container)
 
@@ -137,7 +167,10 @@ func getEnv(ctx context.Context, kube client.Kube, container v1.Container, pod v
 			key, content = getEnvFromSource(secrets, "secret", envFrom.Prefix, envFrom.SecretRef.Name, envFrom.SecretRef.Optional)
 		}
 
-		output[key] = content
+		output = append(output, envValue{
+			source: key,
+			data:   content,
+		})
 	}
 
 	if len(container.Env) > 0 {
@@ -147,7 +180,10 @@ func getEnv(ctx context.Context, kube client.Kube, container v1.Container, pod v
 			inline[env.Name] = getInlineEnv(pod, node, env, configMaps, secrets)
 		}
 
-		output["inline"] = inline
+		output = append(output, envValue{
+			source: "inline",
+			data:   inline,
+		})
 	}
 
 	return output
