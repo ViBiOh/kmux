@@ -13,6 +13,7 @@ import (
 	"github.com/ViBiOh/kmux/pkg/output"
 	"github.com/ViBiOh/kmux/pkg/resource"
 	v1 "k8s.io/api/core/v1"
+	kubeResource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -190,26 +191,7 @@ func getEnv(ctx context.Context, kube client.Kube, container v1.Container, pod v
 }
 
 func getEnvDependencies(ctx context.Context, kube client.Kube, container v1.Container) (map[string]map[string]string, map[string]map[string]string) {
-	configMaps := make(map[string]map[string]string)
-	secrets := make(map[string]map[string]string)
-
-	for _, env := range container.Env {
-		if env.ValueFrom != nil {
-			if env.ValueFrom.ConfigMapKeyRef != nil {
-				configMaps[env.ValueFrom.ConfigMapKeyRef.LocalObjectReference.Name] = nil
-			} else if env.ValueFrom.SecretKeyRef != nil {
-				secrets[env.ValueFrom.SecretKeyRef.LocalObjectReference.Name] = nil
-			}
-		}
-	}
-
-	for _, envFrom := range container.EnvFrom {
-		if envFrom.ConfigMapRef != nil {
-			configMaps[envFrom.ConfigMapRef.LocalObjectReference.Name] = nil
-		} else if envFrom.SecretRef != nil {
-			secrets[envFrom.SecretRef.LocalObjectReference.Name] = nil
-		}
-	}
+	configMaps, secrets := gatherEnvDependencies(container)
 
 	for name := range configMaps {
 		configMap, err := kube.CoreV1().ConfigMaps(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
@@ -232,6 +214,31 @@ func getEnvDependencies(ctx context.Context, kube client.Kube, container v1.Cont
 
 		for key, value := range secret.Data {
 			secrets[name][key] = string(value)
+		}
+	}
+
+	return configMaps, secrets
+}
+
+func gatherEnvDependencies(container v1.Container) (map[string]map[string]string, map[string]map[string]string) {
+	configMaps := make(map[string]map[string]string)
+	secrets := make(map[string]map[string]string)
+
+	for _, env := range container.Env {
+		if env.ValueFrom != nil {
+			if env.ValueFrom.ConfigMapKeyRef != nil {
+				configMaps[env.ValueFrom.ConfigMapKeyRef.LocalObjectReference.Name] = nil
+			} else if env.ValueFrom.SecretKeyRef != nil {
+				secrets[env.ValueFrom.SecretKeyRef.LocalObjectReference.Name] = nil
+			}
+		}
+	}
+
+	for _, envFrom := range container.EnvFrom {
+		if envFrom.ConfigMapRef != nil {
+			configMaps[envFrom.ConfigMapRef.LocalObjectReference.Name] = nil
+		} else if envFrom.SecretRef != nil {
+			secrets[envFrom.SecretRef.LocalObjectReference.Name] = nil
 		}
 	}
 
@@ -349,69 +356,47 @@ func getEnvResourceRef(pod v1.PodSpec, node v1.Node, resource v1.ResourceFieldSe
 
 	switch resource.Resource {
 	case "limits.cpu":
-		limit := container.Resources.Limits.Cpu().MilliValue()
-		if limit == 0 {
-			limit = node.Status.Capacity.Cpu().MilliValue()
-		}
-
-		return fmt.Sprintf("%.0f", math.Ceil(float64(limit)/float64(resource.Divisor.MilliValue())))
+		return getResourceLimit(*container.Resources.Limits.Cpu(), *node.Status.Capacity.Cpu(), resource.Divisor)
 
 	case "limits.memory":
-		limit := container.Resources.Limits.Memory().MilliValue()
-		if limit == 0 {
-			limit = node.Status.Capacity.Memory().MilliValue()
-		}
-
-		return fmt.Sprintf("%.0f", math.Ceil(float64(limit)/float64(resource.Divisor.MilliValue())))
+		return getResourceLimit(*container.Resources.Limits.Memory(), *node.Status.Capacity.Memory(), resource.Divisor)
 
 	case "limits.ephemeral-storage":
-		limit := container.Resources.Limits.StorageEphemeral().MilliValue()
-		if limit == 0 {
-			limit = node.Status.Capacity.StorageEphemeral().MilliValue()
-		}
-
-		return fmt.Sprintf("%.0f", math.Ceil(float64(limit)/float64(resource.Divisor.MilliValue())))
+		return getResourceLimit(*container.Resources.Limits.StorageEphemeral(), *node.Status.Capacity.StorageEphemeral(), resource.Divisor)
 
 	case "requests.cpu":
-		limit := container.Resources.Limits.Cpu().MilliValue()
-		if limit == 0 {
-			return "0"
-		}
-
-		value := limit / resource.Divisor.MilliValue()
-		if value == 0 {
-			return "1"
-		}
-
-		return strconv.FormatInt(value, 10)
+		return getResourceRequest(*container.Resources.Limits.Cpu(), resource.Divisor)
 
 	case "requests.memory":
-		limit := container.Resources.Requests.Memory().MilliValue()
-		if limit == 0 {
-			return "0"
-		}
-
-		value := limit / resource.Divisor.MilliValue()
-		if value == 0 {
-			return "1"
-		}
-
-		return strconv.FormatInt(value, 10)
+		return getResourceRequest(*container.Resources.Limits.Memory(), resource.Divisor)
 
 	case "requests.ephemeral-storage":
-		limit := container.Resources.Requests.StorageEphemeral().MilliValue()
-		if limit == 0 {
-			return "0"
-		}
-
-		value := limit / resource.Divisor.MilliValue()
-		if value == 0 {
-			return "1"
-		}
-
-		return strconv.FormatInt(value, 10)
+		return getResourceRequest(*container.Resources.Limits.StorageEphemeral(), resource.Divisor)
 
 	default:
 		return ""
 	}
+}
+
+func getResourceLimit(defined, node, divisor kubeResource.Quantity) string {
+	limit := defined.MilliValue()
+	if limit == 0 {
+		limit = node.MilliValue()
+	}
+
+	return fmt.Sprintf("%.0f", math.Ceil(float64(limit)/float64(divisor.MilliValue())))
+}
+
+func getResourceRequest(defined, divisor kubeResource.Quantity) string {
+	limit := defined.MilliValue()
+	if limit == 0 {
+		return "0"
+	}
+
+	value := limit / divisor.MilliValue()
+	if value == 0 {
+		return "1"
+	}
+
+	return strconv.FormatInt(value, 10)
 }
