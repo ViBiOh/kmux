@@ -21,7 +21,7 @@ curl \
   --show-error \
   --location \
   --max-time 300 \
-  "https://github.com/ViBiOh/kmux/releases/download/v0.8.2/kmux_$(uname -s | tr "[:upper:]" "[:lower:]")_x86_64.tar.gz" | tar -xz "kmux"
+  "https://github.com/ViBiOh/kmux/releases/download/v0.8.3/kmux_$(uname -s | tr "[:upper:]" "[:lower:]")_x86_64.tar.gz" | tar -xz "kmux"
 mv "kmux" "/usr/local/bin/kmux"
 ```
 
