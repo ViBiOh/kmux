@@ -107,13 +107,13 @@ func (eg EnvGetter) Get(ctx context.Context, kube client.Kube) error {
 			fmt.Fprintf(containerOutput, "%s", value)
 		}
 
-		var outputter output.Outputter
+		outputter := kube.Outputter
 
 		if len(containers) != 1 {
 			outputter = kube.Outputter.Child(false, output.Green.Sprintf("[%s]", container.Name))
 		}
 
-		outputter.Info(containerOutput.String())
+		outputter.Info("%s", containerOutput.String())
 	}
 
 	return nil
