@@ -61,11 +61,20 @@ Global Flags:
 
 ### `log`
 
-`log` command open a pod's watcher on a resource (Deployment, Service, CronJob, etc) by using label or fiels selector and stream every container of every pod it finds. New pods matching the selector are automatically streamed.
+`log` command open a pod's watcher on a resource (Deployment, Service, CronJob, etc) by using label or fiels selector and stream every container's logs of every pod it finds. New pods matching the selector are automatically streamed. Logs are stream by default (the `--follow` option in regular `kubectl`).
 
-Each log line has a prefix of the pod's name and the container name, and also the context's name if there are multiple contexts. These kind of metadatas are written to the `stderr`, this way, if you have logs in JSON, you can pipe `kmux` output into `jq` for example for extracting wanted data from logs (instead of using `grep`).
+Each log line has a prefix of the pod's name and the container name, and also the context's name if there are multiple contexts. These kind of metadatas are written to the `stderr`, this way, if you have logs in JSON, you can pipe `kmux` output into `jq` for example for extracting wanted data from logs (instead of using `--grep` or native `grep`). You can also remove completely the prefixes by setting `--raw-output` option.
 
-The `--containers` can be set multiple times to restrict output to the given containers' name.
+If your logs are in JSON, you can also filter output based on their color:
+
+- 🟥 `red`: HTTP/5xx or `ERROR`, `CRITICAL` or `FATAL` level (case insensitive)
+- 🟨 `yellow`: HTTP/4xx or `WARN[ING]` level (case insensitive)
+- ⬜️ `white`: Regular log (or unidentified)
+- 🟩 `green`: HTTP/3xx or `DEBUG`, `TRACE` level (case insensitive)
+
+Log levels and HTTP Status codes and are determined by searching for keys defined in options `--statusCodeKeys` and `--levelKeys`. The most common values are defined by default. First match of level or http status code determine the color.
+
+The `--container` can be set to restrict output to the given containers' name.
 
 ```bash
 Get logs of a given resource
@@ -77,13 +86,14 @@ Aliases:
   log, logs
 
 Flags:
-  -c, --container  string         Filter container's name by regexp, default to all containers
+  -c, --container string          Filter container's name by regexp, default to all containers
   -d, --dry-run                   Dry-run, print only pods
   -g, --grep string               Regexp to filter log
       --grepColor string          Get logs only above given color (red > yellow > green)
   -h, --help                      help for log
   -v, --invert-match              Invert regexp filter matching
       --levelKeys strings         Keys for level in JSON (default [level,severity])
+      --no-follow                 Don't follow logs
   -r, --raw-output                Raw ouput, don't print context or pod prefixes
   -l, --selector stringToString   Labels to filter pods (default [])
   -s, --since duration            Display logs since given duration (default 1h0m0s)

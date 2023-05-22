@@ -21,6 +21,8 @@ var (
 	dryRun    bool
 	rawOutput bool
 
+	noFollow bool
+
 	since          time.Duration
 	labelsSelector map[string]string
 
@@ -119,6 +121,7 @@ var logCmd = &cobra.Command{
 		logger := log.NewLogger(resourceType, resourceName, labelsSelector, since).
 			WithDryRun(dryRun).
 			WithContainerRegexp(containerRegexp).
+			WithNoFollow(noFollow).
 			WithLogRegexp(logRegexp).
 			WithInvertRegexp(invertGrep).
 			WithColorFilter(logColorFilter).
@@ -139,6 +142,8 @@ func initLog() {
 
 	flags.BoolVarP(&dryRun, "dry-run", "d", false, "Dry-run, print only pods")
 	flags.BoolVarP(&rawOutput, "raw-output", "r", false, "Raw ouput, don't print context or pod prefixes")
+
+	flags.BoolVarP(&noFollow, "no-follow", "", false, "Don't follow logs")
 
 	flags.StringToStringVarP(&labelsSelector, "selector", "l", nil, "Labels to filter pods")
 

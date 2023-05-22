@@ -31,6 +31,7 @@ type Logger struct {
 	rawOutput       bool
 	dryRun          bool
 	invertRegexp    bool
+	noFollow        bool
 }
 
 func NewLogger(resourceType, resourceName string, selector map[string]string, since time.Duration) Logger {
@@ -50,6 +51,12 @@ func (l Logger) WithDryRun(dryRun bool) Logger {
 
 func (l Logger) WithContainerRegexp(containerRegexp *regexp.Regexp) Logger {
 	l.containerRegexp = containerRegexp
+
+	return l
+}
+
+func (l Logger) WithNoFollow(noFollow bool) Logger {
+	l.noFollow = noFollow
 
 	return l
 }
@@ -85,7 +92,7 @@ func (l Logger) WithRawOutput(rawOutput bool) Logger {
 }
 
 func (l Logger) Log(ctx context.Context, kube client.Kube) error {
-	podWatcher, err := resource.WatchPods(ctx, kube, l.resourceType, l.resourceName, l.selector, l.dryRun)
+	podWatcher, err := resource.WatchPods(ctx, kube, l.resourceType, l.resourceName, l.selector, l.dryRun || l.noFollow)
 	if err != nil {
 		return fmt.Errorf("watch pods: %w", err)
 	}
@@ -170,7 +177,7 @@ func (l Logger) logPod(ctx context.Context, kube client.Kube, namespace, name, c
 
 func (l Logger) streamPod(ctx context.Context, kube client.Kube, namespace, name, container string) {
 	stream, err := kube.CoreV1().Pods(namespace).GetLogs(name, &v1.PodLogOptions{
-		Follow:       true,
+		Follow:       !l.noFollow,
 		SinceSeconds: &l.since,
 		Container:    container,
 	}).Stream(ctx)
