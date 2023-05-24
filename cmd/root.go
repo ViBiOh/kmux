@@ -96,13 +96,13 @@ func getKubeClient(configRules clientcmd.ClientConfigLoader, context string) (cl
 		return client.Kube{}, fmt.Errorf("read configured namespace: %w", err)
 	}
 
-	if allNamespace {
-		namespace = ""
-	}
-
 	clientset, err := kubernetes.NewForConfig(k8sConfig)
 	if err != nil {
 		return client.Kube{}, fmt.Errorf("create kubernetes client: %w", err)
+	}
+
+	if allNamespace {
+		namespace = ""
 	}
 
 	return client.New(context, namespace, k8sConfig, clientset), nil

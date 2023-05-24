@@ -28,7 +28,7 @@ type envValue struct {
 }
 
 func (ev envValue) String() string {
-	output := fmt.Sprintf("# %s\n", ev.source)
+	output := output.Yellow.Sprintf("# %s\n", ev.source)
 
 	entries := make([]string, 0, len(ev.data))
 
