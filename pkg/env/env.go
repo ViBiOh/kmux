@@ -113,7 +113,7 @@ func (eg EnvGetter) Get(ctx context.Context, kube client.Kube) error {
 			outputter = kube.Outputter.Child(false, output.Green.Sprintf("[%s]", container.Name))
 		}
 
-		outputter.Info("%s", containerOutput.String())
+		outputter.Std("%s", containerOutput.String())
 	}
 
 	return nil
