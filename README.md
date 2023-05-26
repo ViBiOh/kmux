@@ -8,6 +8,8 @@
 
 For example when you have multiple Kubernetes clusters you want to tail the logs of the same deployment simultaneously, or check the image deployed on each cluster.
 
+[![asciicast](https://asciinema.org/a/vdYLDWGB7X3v5H5DW9ccnRkg1.svg)](https://asciinema.org/a/vdYLDWGB7X3v5H5DW9ccnRkg1)
+
 ## Getting started
 
 ### Release
