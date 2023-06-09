@@ -145,7 +145,7 @@ Flags:
 `restart` perform the equivalent of a rollout restart on given resource (add an annotation of the pod spec). For `job`, it's the equivalent of a replacement (delete then create).
 
 ```bash
-Restart pod of the given resources
+Restart the given resource
 
 Usage:
   kmux restart TYPE NAME [flags]
