@@ -74,7 +74,7 @@ If your logs are in JSON, you can also filter output based on their color:
 - ⬜️ `white`: Regular log (or unidentified)
 - 🟩 `green`: HTTP/3xx or `DEBUG`, `TRACE` level (case insensitive)
 
-Log levels and HTTP Status codes and are determined by searching for keys defined in options `--statusCodeKeys` and `--levelKeys`. The most common values are defined by default. First match of level or http status code determine the color.
+Log levels and HTTP Status codes are determined by searching for keys defined in options `--statusCodeKeys` and `--levelKeys`. The most common values are defined by default. First match of level or http status code determine the color.
 
 The `--container` can be set to restrict output to the given containers' name.
 
@@ -142,7 +142,7 @@ Flags:
 
 ### `restart`
 
-`restart` perform the equivalent of a rollout restart on given resource (add an annotation of the pod spec). For `job`, it's the equivalent of a replacement (delete then create).
+`restart` performs the equivalent of a rollout restart on given resource (add an annotation of the pod spec). For `job`, it's the equivalent of a replacement (delete then create).
 
 ```bash
 Restart the given resource
