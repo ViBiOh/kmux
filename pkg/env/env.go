@@ -384,7 +384,12 @@ func getResourceLimit(defined, node, divisor kubeResource.Quantity) string {
 		limit = node.MilliValue()
 	}
 
-	return fmt.Sprintf("%.0f", math.Ceil(float64(limit)/float64(divisor.MilliValue())))
+	divider := divisor.MilliValue()
+	if divider == 0 {
+		divider = 1000
+	}
+
+	return fmt.Sprintf("%.0f", math.Ceil(float64(limit)/float64(divider)))
 }
 
 func getResourceRequest(defined, divisor kubeResource.Quantity) string {
