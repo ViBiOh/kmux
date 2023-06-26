@@ -152,7 +152,7 @@ func isForwardPodReady(pod *v1.Pod, remotePort int32) bool {
 	container, hasReadiness := getForwardContainer(pod, remotePort)
 
 	if len(container) == 0 {
-		return false
+		return true
 	}
 
 	if !hasReadiness {
