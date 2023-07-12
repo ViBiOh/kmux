@@ -178,7 +178,7 @@ func getEnv(ctx context.Context, kube client.Kube, container v1.Container, pod v
 		inline := make(map[string]string)
 
 		for _, env := range container.Env {
-			inline[env.Name] = getInlineEnv(pod, node, env, configMaps, secrets)
+			inline[env.Name] = getInlineEnv(pod, container, node, env, configMaps, secrets)
 		}
 
 		output = append(output, envValue{
@@ -265,15 +265,15 @@ func getEnvFromSource(storage map[string]map[string]string, kind, prefix, name s
 	return keyName, content
 }
 
-func getInlineEnv(pod v1.Pod, node v1.Node, envVar v1.EnvVar, configMaps, secrets map[string]map[string]string) string {
+func getInlineEnv(pod v1.Pod, container v1.Container, node v1.Node, envVar v1.EnvVar, configMaps, secrets map[string]map[string]string) string {
 	if len(envVar.Value) > 0 {
 		return envVar.Value
 	}
 
-	return getValueFrom(pod, node, envVar, configMaps, secrets)
+	return getValueFrom(pod, container, node, envVar, configMaps, secrets)
 }
 
-func getValueFrom(pod v1.Pod, node v1.Node, envVar v1.EnvVar, configMaps, secrets map[string]map[string]string) string {
+func getValueFrom(pod v1.Pod, container v1.Container, node v1.Node, envVar v1.EnvVar, configMaps, secrets map[string]map[string]string) string {
 	if envVar.ValueFrom.ConfigMapKeyRef != nil {
 		return getValueFromRef(configMaps, "configmap", envVar.ValueFrom.ConfigMapKeyRef.Name, envVar.ValueFrom.ConfigMapKeyRef.Key, envVar.ValueFrom.ConfigMapKeyRef.Optional)
 	}
@@ -287,7 +287,7 @@ func getValueFrom(pod v1.Pod, node v1.Node, envVar v1.EnvVar, configMaps, secret
 	}
 
 	if envVar.ValueFrom.ResourceFieldRef != nil {
-		return getEnvResourceRef(pod.Spec, node, *envVar.ValueFrom.ResourceFieldRef)
+		return getEnvResourceRef(container, node, *envVar.ValueFrom.ResourceFieldRef)
 	}
 
 	return ""
@@ -345,15 +345,7 @@ func getEnvFieldRef(pod v1.Pod, field v1.ObjectFieldSelector) string {
 	}
 }
 
-func getEnvResourceRef(pod v1.PodSpec, node v1.Node, resource v1.ResourceFieldSelector) string {
-	var container v1.Container
-
-	for _, container = range pod.Containers {
-		if resource.ContainerName == container.Name {
-			break
-		}
-	}
-
+func getEnvResourceRef(container v1.Container, node v1.Node, resource v1.ResourceFieldSelector) string {
 	switch resource.Resource {
 	case "limits.cpu":
 		return getResourceLimit(*container.Resources.Limits.Cpu(), *node.Status.Capacity.Cpu(), resource.Divisor)
