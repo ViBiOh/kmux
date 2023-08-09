@@ -95,6 +95,8 @@ var restartCmd = &cobra.Command{
 					return err
 				}
 
+				job.ResourceVersion = ""
+
 				_, err = kube.BatchV1().Jobs(kube.Namespace).Create(ctx, job, v1.CreateOptions{})
 				return err
 			case "sts", "statefulset", "statefulsets":
