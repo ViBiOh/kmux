@@ -144,6 +144,8 @@ func init() {
 	}
 
 	rootCmd.AddCommand(versionCmd)
+
+	initRestart()
 	rootCmd.AddCommand(restartCmd)
 
 	initImage()

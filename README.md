@@ -151,7 +151,8 @@ Usage:
   kmux restart TYPE NAME [flags]
 
 Flags:
-  -h, --help   help for restart
+  -h, --help          help for restart
+  -u, --user string   User added in the restartedBy annotation (read from $KMUX_USER)
 ```
 
 ### `image`

@@ -3,18 +3,21 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/ViBiOh/kmux/pkg/client"
-	"github.com/ViBiOh/kmux/pkg/output"
 	"github.com/ViBiOh/kmux/pkg/resource"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
+
+var user string
 
 type restartPatch struct {
 	Spec struct {
@@ -56,9 +59,13 @@ var restartCmd = &cobra.Command{
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	Args: cobra.MatchAll(cobra.ExactArgs(2), cobra.OnlyValidArgs),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		resourceType := args[0]
 		resourceName := args[1]
+
+		if len(user) == 0 {
+			return errors.New("--user is required")
+		}
 
 		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
@@ -66,12 +73,12 @@ var restartCmd = &cobra.Command{
 		var patch restartPatch
 		patch.Spec.Template.Metadata.Annotations = map[string]string{
 			"kmux.vibioh.fr/restartedAt": time.Now().Format(time.RFC3339),
+			"kmux.vibioh.fr/restartedBy": user,
 		}
 
 		payload, err := json.Marshal(patch)
 		if err != nil {
-			output.Err("", "marshal patch: %s", err)
-			return
+			return fmt.Errorf("marshal patch: %w", err)
 		}
 
 		clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
@@ -106,5 +113,13 @@ var restartCmd = &cobra.Command{
 				return fmt.Errorf("unhandled resource type `%s` for restart", resourceType)
 			}
 		})
+
+		return nil
 	},
+}
+
+func initRestart() {
+	flags := restartCmd.Flags()
+
+	flags.StringVarP(&user, "user", "u", os.Getenv("KMUX_USER"), "User added in the restartedBy annotation (read from $KMUX_USER)")
 }
