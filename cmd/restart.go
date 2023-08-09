@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -63,17 +62,16 @@ var restartCmd = &cobra.Command{
 		resourceType := args[0]
 		resourceName := args[1]
 
-		if len(user) == 0 {
-			return errors.New("--user is required")
-		}
-
 		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
 
 		var patch restartPatch
 		patch.Spec.Template.Metadata.Annotations = map[string]string{
 			"kmux.vibioh.fr/restartedAt": time.Now().Format(time.RFC3339),
-			"kmux.vibioh.fr/restartedBy": user,
+		}
+
+		if len(user) != 0 {
+			patch.Spec.Template.Metadata.Annotations["kmux.vibioh.fr/restartedBy"] = user
 		}
 
 		payload, err := json.Marshal(patch)
