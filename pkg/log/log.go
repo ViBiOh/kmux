@@ -114,7 +114,10 @@ func (l Logger) Log(ctx context.Context, kube client.Kube) error {
 		if event.Type == watch.Deleted || event.Type == watch.Error || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
 			if ok {
 				streamCancel.(context.CancelFunc)()
-				activeStreams.Delete(pod.UID)
+
+				if event.Type == watch.Deleted {
+					activeStreams.Delete(pod.UID)
+				}
 			} else if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
 				l.handlePod(ctx, kube, &activeStreams, streaming, *pod)
 			}
@@ -168,7 +171,7 @@ func (l Logger) logPod(ctx context.Context, kube client.Kube, namespace, name, c
 		Container:    container,
 	}).DoRaw(ctx)
 	if err != nil {
-		kube.Err("%s", err)
+		kube.Err("get logs: %s", err)
 		return
 	}
 
@@ -182,7 +185,7 @@ func (l Logger) streamPod(ctx context.Context, kube client.Kube, namespace, name
 		Container:    container,
 	}).Stream(ctx)
 	if err != nil {
-		kube.Err("%s", err)
+		kube.Err("stream logs: %s", err)
 		return
 	}
 
