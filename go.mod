@@ -1,6 +1,7 @@
 module github.com/ViBiOh/kmux
 
 go 1.21
+toolchain go1.21.0
 
 require (
 	github.com/fatih/color v1.15.0
