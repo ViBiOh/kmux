@@ -51,7 +51,7 @@ jobs:
           gpg_private_key: ${{ env.gpg_private_key }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
-      - uses: goreleaser/goreleaser-action@v4
+      - uses: goreleaser/goreleaser-action@v5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
