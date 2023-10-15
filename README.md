@@ -92,7 +92,6 @@ Flags:
   -d, --dry-run                   Dry-run, print only pods
   -g, --grep string               Regexp to filter log
       --grepColor string          Get logs only above given color (red > yellow > green)
-  -h, --help                      help for log
   -v, --invert-match              Invert regexp filter matching
       --levelKeys strings         Keys for level in JSON (default [level,severity])
       --no-follow                 Don't follow logs
@@ -119,7 +118,6 @@ Aliases:
 
 Flags:
   -d, --dry-run   Dry-run, print only pods
-  -h, --help      help for port-forward
 ```
 
 ### `watch`
@@ -135,7 +133,6 @@ Usage:
   kmux watch [flags]
 
 Flags:
-  -h, --help                      help for watch
   -o, --output string             Output format. One of: (wide)
   -l, --selector stringToString   Labels to filter pods (default [])
 ```
@@ -151,7 +148,6 @@ Usage:
   kmux restart TYPE NAME [flags]
 
 Flags:
-  -h, --help          help for restart
   -u, --user string   User added in the restartedBy annotation (read from $KMUX_USER)
 ```
 
@@ -167,7 +163,6 @@ Usage:
 
 Flags:
   -c, --container string   Filter container's name by regexp, default to all containers
-  -h, --help               help for image
 ```
 
 ### `env`
@@ -182,5 +177,4 @@ Usage:
 
 Flags:
   -c, --container string   Filter container's name by regexp, default to all containers
-  -h, --help               help for env
 ```
