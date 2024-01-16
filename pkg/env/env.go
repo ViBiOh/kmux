@@ -274,6 +274,10 @@ func getInlineEnv(pod v1.Pod, container v1.Container, node v1.Node, envVar v1.En
 }
 
 func getValueFrom(pod v1.Pod, container v1.Container, node v1.Node, envVar v1.EnvVar, configMaps, secrets map[string]map[string]string) string {
+	if envVar.ValueFrom == nil {
+		return ""
+	}
+
 	if envVar.ValueFrom.ConfigMapKeyRef != nil {
 		return getValueFromRef(configMaps, "configmap", envVar.ValueFrom.ConfigMapKeyRef.Name, envVar.ValueFrom.ConfigMapKeyRef.Key, envVar.ValueFrom.ConfigMapKeyRef.Optional)
 	}
