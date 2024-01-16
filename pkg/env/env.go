@@ -361,13 +361,13 @@ func getEnvResourceRef(container v1.Container, node v1.Node, resource v1.Resourc
 		return getResourceLimit(*container.Resources.Limits.StorageEphemeral(), *node.Status.Capacity.StorageEphemeral(), resource.Divisor)
 
 	case "requests.cpu":
-		return getResourceRequest(*container.Resources.Limits.Cpu(), resource.Divisor)
+		return getResourceRequest(*container.Resources.Requests.Cpu(), resource.Divisor)
 
 	case "requests.memory":
-		return getResourceRequest(*container.Resources.Limits.Memory(), resource.Divisor)
+		return getResourceRequest(*container.Resources.Requests.Memory(), resource.Divisor)
 
 	case "requests.ephemeral-storage":
-		return getResourceRequest(*container.Resources.Limits.StorageEphemeral(), resource.Divisor)
+		return getResourceRequest(*container.Resources.Requests.StorageEphemeral(), resource.Divisor)
 
 	default:
 		return ""
@@ -394,7 +394,12 @@ func getResourceRequest(defined, divisor kubeResource.Quantity) string {
 		return "0"
 	}
 
-	value := limit / divisor.MilliValue()
+	divider := divisor.MilliValue()
+	if divider == 0 {
+		divider = 1000
+	}
+
+	value := limit / divider
 	if value == 0 {
 		return "1"
 	}
