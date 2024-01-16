@@ -1,6 +1,9 @@
 package concurrent
 
 import (
+	"fmt"
+	"log/slog"
+	"runtime/debug"
 	"sync"
 )
 
@@ -17,6 +20,12 @@ func (g *Simple) Go(f func()) {
 
 	go func() {
 		defer g.wg.Done()
+
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error(fmt.Sprintf("panic: %s", r), "error.stack", string(debug.Stack()))
+			}
+		}()
 
 		f()
 	}()
