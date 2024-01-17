@@ -30,6 +30,10 @@ var rootCmd = &cobra.Command{
 	Use:   "kmux",
 	Short: "Multiplexing kubectl common tasks across clusters",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
+		if cmd.Name() == "version" {
+			return
+		}
+
 		if parent := cmd.Parent(); parent != nil && parent.Name() == "completion" {
 			return
 		}
