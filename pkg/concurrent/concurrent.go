@@ -1,6 +1,7 @@
 package concurrent
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"runtime/debug"
@@ -23,7 +24,7 @@ func (g *Simple) Go(f func()) {
 
 		defer func() {
 			if r := recover(); r != nil {
-				slog.Error(fmt.Sprintf("panic: %s", r), "error.stack", string(debug.Stack()))
+				slog.LogAttrs(context.Background(), slog.LevelError, fmt.Sprintf("panic: %s", r), slog.String("error.stack", string(debug.Stack())))
 			}
 		}()
 
