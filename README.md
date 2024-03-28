@@ -2,7 +2,6 @@
 
 [![Build](https://github.com/ViBiOh/kmux/workflows/Build/badge.svg)](https://github.com/ViBiOh/kmux/actions)
 [![codecov](https://codecov.io/gh/ViBiOh/kmux/branch/main/graph/badge.svg)](https://codecov.io/gh/ViBiOh/kmux)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=ViBiOh_kube&metric=alert_status)](https://sonarcloud.io/dashboard?id=ViBiOh_kube)
 
 `kmux` is a tool for executing common Kubernetes actions on one or many clusters at the same time.
 
