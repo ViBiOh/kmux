@@ -175,7 +175,7 @@ func (l Logger) logPod(ctx context.Context, kube client.Kube, namespace, name, c
 		return
 	}
 
-	l.outputLog(kube, bytes.NewReader(content), l.logOutputter(kube, name, container))
+	l.outputLog(bytes.NewReader(content), l.logOutputter(kube, name, container))
 }
 
 func (l Logger) streamPod(ctx context.Context, kube client.Kube, namespace, name, container string) {
@@ -195,14 +195,14 @@ func (l Logger) streamPod(ctx context.Context, kube client.Kube, namespace, name
 		}
 	}()
 
-	l.outputLog(kube, stream, l.logOutputter(kube, name, container))
+	l.outputLog(stream, l.logOutputter(kube, name, container))
 }
 
 func (l Logger) logOutputter(kube client.Kube, name, container string) output.Outputter {
 	return kube.Child(l.rawOutput, output.Green.Sprintf("[%s/%s]", name, container))
 }
 
-func (l Logger) outputLog(kube client.Kube, reader io.Reader, outputter output.Outputter) {
+func (l Logger) outputLog(reader io.Reader, outputter output.Outputter) {
 	if !l.rawOutput {
 		outputter.Info(output.Yellow.Sprint("Log..."))
 		defer outputter.Info(output.Yellow.Sprint("Log ended."))
