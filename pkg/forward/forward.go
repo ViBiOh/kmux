@@ -128,7 +128,7 @@ func getTargetPort(ctx context.Context, kube client.Kube, name, port string) (st
 }
 
 func getForwardPort(pod *v1.Pod, remotePort string) int32 {
-	numericPort, err := strconv.ParseUint(remotePort, 10, 32)
+	numericPort, err := strconv.ParseInt(remotePort, 10, 32)
 	if err == nil {
 		return int32(numericPort)
 	}
