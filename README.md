@@ -1,7 +1,6 @@
 # kmux
 
 [![Build](https://github.com/ViBiOh/kmux/workflows/Build/badge.svg)](https://github.com/ViBiOh/kmux/actions)
-[![codecov](https://codecov.io/gh/ViBiOh/kmux/branch/main/graph/badge.svg)](https://codecov.io/gh/ViBiOh/kmux)
 
 `kmux` is a tool for executing common Kubernetes actions on one or many clusters at the same time.
 
