@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"syscall"
 	"time"
 
@@ -26,13 +27,17 @@ type watchPod struct {
 	v1.Pod      `json:"pod"`
 }
 
-var outputFormat string
+var (
+	outputFormat string
+	showLabels   bool
+)
 
 func initWatch() {
 	flags := watchCmd.Flags()
 
 	flags.StringVarP(&outputFormat, "output", "o", "", "Output format. One of: (wide)")
 	flags.StringToStringVarP(&labelsSelector, "selector", "l", nil, "Labels to filter pods")
+	flags.BoolVarP(&showLabels, "show-labels", "", false, "Show all labels as the last column")
 }
 
 var watchCmd = &cobra.Command{
@@ -106,6 +111,11 @@ func initWatchTable() *table.Table {
 			table.NewCell("NOMINATED NODE"),
 			table.NewCell("READINESS GATES"),
 		)
+	}
+
+	if showLabels {
+		defaultWidths = append(defaultWidths, 12)
+		content = append(content, table.NewCell("LABELS"))
 	}
 
 	watchTable := table.New(defaultWidths)
@@ -228,6 +238,10 @@ func outputWatch(watchTable *table.Table, contextName string, pod v1.Pod) {
 		)
 	}
 
+	if showLabels {
+		content = append(content, table.NewCell(labelsAsString(pod.GetLabels())))
+	}
+
 	output.Std("", watchTable.Format(content))
 }
 
@@ -244,6 +258,20 @@ func getPhaseCell(phase string) table.Cell {
 	default:
 		return table.NewCellColor(phase, output.Yellow)
 	}
+}
+
+func labelsAsString(labels map[string]string) string {
+	values := make([]string, len(labels))
+
+	var index int
+	for key, value := range labels {
+		values[index] = fmt.Sprintf("%s=%s", key, value)
+		index++
+	}
+
+	sort.Strings(values)
+
+	return strings.Join(values, ",")
 }
 
 // from https://github.com/kubernetes/kubernetes/blob/v1.24.3/pkg/printers/internalversion/printers.go#L743
