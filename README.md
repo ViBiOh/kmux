@@ -133,6 +133,7 @@ Usage:
 Flags:
   -o, --output string             Output format. One of: (wide)
   -l, --selector stringToString   Labels to filter pods (default [])
+      --show-annotations          Show all annotations as the last column (after labels if both asked)
       --show-labels               Show all labels as the last column
 ```
 

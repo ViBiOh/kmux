@@ -28,8 +28,9 @@ type watchPod struct {
 }
 
 var (
-	outputFormat string
-	showLabels   bool
+	outputFormat    string
+	showLabels      bool
+	showAnnotations bool
 )
 
 func initWatch() {
@@ -38,6 +39,7 @@ func initWatch() {
 	flags.StringVarP(&outputFormat, "output", "o", "", "Output format. One of: (wide)")
 	flags.StringToStringVarP(&labelsSelector, "selector", "l", nil, "Labels to filter pods")
 	flags.BoolVarP(&showLabels, "show-labels", "", false, "Show all labels as the last column")
+	flags.BoolVarP(&showAnnotations, "show-annotations", "", false, "Show all annotations as the last column (after labels if both asked)")
 }
 
 var watchCmd = &cobra.Command{
@@ -116,6 +118,11 @@ func initWatchTable() *table.Table {
 	if showLabels {
 		defaultWidths = append(defaultWidths, 12)
 		content = append(content, table.NewCell("LABELS"))
+	}
+
+	if showAnnotations {
+		defaultWidths = append(defaultWidths, 12)
+		content = append(content, table.NewCell("ANNOTATIONS"))
 	}
 
 	watchTable := table.New(defaultWidths)
@@ -239,7 +246,11 @@ func outputWatch(watchTable *table.Table, contextName string, pod v1.Pod) {
 	}
 
 	if showLabels {
-		content = append(content, table.NewCell(labelsAsString(pod.GetLabels())))
+		content = append(content, table.NewCell(mapAsString(pod.GetLabels())))
+	}
+
+	if showAnnotations {
+		content = append(content, table.NewCell(mapAsString(pod.GetAnnotations())))
 	}
 
 	output.Std("", watchTable.Format(content))
@@ -260,7 +271,7 @@ func getPhaseCell(phase string) table.Cell {
 	}
 }
 
-func labelsAsString(labels map[string]string) string {
+func mapAsString(labels map[string]string) string {
 	values := make([]string, len(labels))
 
 	var index int
