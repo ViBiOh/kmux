@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"path"
 	"sort"
 	"strings"
 	"syscall"
@@ -31,6 +32,7 @@ var (
 	outputFormat    string
 	showLabels      bool
 	showAnnotations bool
+	labelColumns    []string
 )
 
 func initWatch() {
@@ -40,6 +42,7 @@ func initWatch() {
 	flags.StringToStringVarP(&labelsSelector, "selector", "l", nil, "Labels to filter pods")
 	flags.BoolVarP(&showLabels, "show-labels", "", false, "Show all labels as the last column")
 	flags.BoolVarP(&showAnnotations, "show-annotations", "", false, "Show all annotations as the last column (after labels if both asked)")
+	flags.StringSliceVarP(&labelColumns, "label-columns", "L", nil, "Labels that are going to be presented as columns")
 }
 
 var watchCmd = &cobra.Command{
@@ -113,6 +116,11 @@ func initWatchTable() *table.Table {
 			table.NewCell("NOMINATED NODE"),
 			table.NewCell("READINESS GATES"),
 		)
+	}
+
+	for _, label := range labelColumns {
+		defaultWidths = append(defaultWidths, 12)
+		content = append(content, table.NewCell(strings.ToUpper(path.Base(label))))
 	}
 
 	if showLabels {
@@ -243,6 +251,10 @@ func outputWatch(watchTable *table.Table, contextName string, pod v1.Pod) {
 			table.NewCell(nominatedNode),
 			table.NewCell(readinessGates),
 		)
+	}
+
+	for _, label := range labelColumns {
+		content = append(content, table.NewCell(pod.GetLabels()[label]))
 	}
 
 	if showLabels {

@@ -131,6 +131,7 @@ Usage:
   kmux watch [flags]
 
 Flags:
+  -L, --label-columns strings     Labels that are going to be presented as columns
   -o, --output string             Output format. One of: (wide)
   -l, --selector stringToString   Labels to filter pods (default [])
       --show-annotations          Show all annotations as the last column (after labels if both asked)
