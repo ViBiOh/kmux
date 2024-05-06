@@ -28,11 +28,10 @@ var (
 
 	jsonColorKeys []string
 
-	logFilter  string
+	logFilters []string
 	invertGrep bool
 
 	logColorFilter *color.Color
-	logRegexp      *regexp.Regexp
 )
 
 var logCmd = &cobra.Command{
@@ -91,12 +90,14 @@ var logCmd = &cobra.Command{
 			}
 		}
 
-		if len(logFilter) != 0 {
+		logRegexes := make([]*regexp.Regexp, len(logFilters))
+
+		for index, logFilter := range logFilters {
 			var err error
 
-			logRegexp, err = regexp.Compile(logFilter)
+			logRegexes[index], err = regexp.Compile(logFilter)
 			if err != nil {
-				return fmt.Errorf("log filter compile: %w", err)
+				return fmt.Errorf("compile log filter `%s`: %w", logFilter, err)
 			}
 		}
 
@@ -122,7 +123,7 @@ var logCmd = &cobra.Command{
 			WithDryRun(dryRun).
 			WithContainerRegexp(containerRegexp).
 			WithNoFollow(noFollow).
-			WithLogRegexp(logRegexp).
+			WithLogRegexes(logRegexes).
 			WithInvertRegexp(invertGrep).
 			WithColorFilter(logColorFilter).
 			WithJsonColorKeys(jsonColorKeys).
@@ -147,7 +148,7 @@ func initLog() {
 
 	flags.StringToStringVarP(&labelsSelector, "selector", "l", nil, "Labels to filter pods")
 
-	flags.StringVarP(&logFilter, "grep", "g", "", "Regexp to filter log")
+	flags.StringSliceVarP(&logFilters, "grep", "g", nil, "Regexp to filter log")
 	flags.BoolVarP(&invertGrep, "invert-match", "v", false, "Invert regexp filter matching")
 
 	flags.String("grepColor", "", "Get logs only above given color (red > yellow > green)")

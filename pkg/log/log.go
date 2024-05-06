@@ -21,8 +21,8 @@ import (
 
 type Logger struct {
 	selector        map[string]string
+	logRegexes      []*regexp.Regexp
 	containerRegexp *regexp.Regexp
-	logRegexp       *regexp.Regexp
 	colorFilter     *color.Color
 	resourceType    string
 	resourceName    string
@@ -61,8 +61,8 @@ func (l Logger) WithNoFollow(noFollow bool) Logger {
 	return l
 }
 
-func (l Logger) WithLogRegexp(logRegexp *regexp.Regexp) Logger {
-	l.logRegexp = logRegexp
+func (l Logger) WithLogRegexes(logRegexes []*regexp.Regexp) Logger {
+	l.logRegexes = logRegexes
 
 	return l
 }
@@ -222,16 +222,31 @@ func (l Logger) outputLog(reader io.Reader, outputter output.Outputter) {
 			continue
 		}
 
-		if l.logRegexp == nil {
+		if len(l.logRegexes) == 0 {
 			outputter.Std(Format(text, colorOutputter))
 
 			continue
 		}
 
-		if match := l.logRegexp.MatchString(text); (match && l.invertRegexp) || (!l.invertRegexp && !match) {
+		if match := l.matchRegexes(text); (match && l.invertRegexp) || (!l.invertRegexp && !match) {
 			continue
 		}
 
-		outputter.Std(FormatGrep(text, l.logRegexp, colorOutputter))
+		greppedText := text
+		for _, logRegexp := range l.logRegexes {
+			greppedText = FormatGrep(greppedText, logRegexp, colorOutputter)
+		}
+
+		outputter.Std(greppedText)
 	}
+}
+
+func (l Logger) matchRegexes(text string) bool {
+	for _, logRegexp := range l.logRegexes {
+		if !logRegexp.MatchString(text) {
+			return false
+		}
+	}
+
+	return true
 }

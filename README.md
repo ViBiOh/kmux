@@ -88,7 +88,7 @@ Aliases:
 Flags:
   -c, --container string          Filter container's name by regexp, default to all containers
   -d, --dry-run                   Dry-run, print only pods
-  -g, --grep string               Regexp to filter log
+  -g, --grep strings              Regexp to filter log
       --grepColor string          Get logs only above given color (red > yellow > green)
   -v, --invert-match              Invert regexp filter matching
       --levelKeys strings         Keys for level in JSON (default [level,severity])
