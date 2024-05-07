@@ -228,7 +228,11 @@ func (l Logger) outputLog(reader io.Reader, outputter output.Outputter) {
 			continue
 		}
 
-		if match := l.matchRegexes(text); (match && l.invertRegexp) || (!l.invertRegexp && !match) {
+		if l.invertRegexp {
+			if !l.noneMatch(text) {
+				continue
+			}
+		} else if !l.match(text) {
 			continue
 		}
 
@@ -241,7 +245,17 @@ func (l Logger) outputLog(reader io.Reader, outputter output.Outputter) {
 	}
 }
 
-func (l Logger) matchRegexes(text string) bool {
+func (l Logger) noneMatch(text string) bool {
+	for _, logRegexp := range l.logRegexes {
+		if logRegexp.MatchString(text) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (l Logger) match(text string) bool {
 	for _, logRegexp := range l.logRegexes {
 		if !logRegexp.MatchString(text) {
 			return false
