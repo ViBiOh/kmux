@@ -95,5 +95,5 @@ run:
 ## release: Create a release
 .PHONY: release
 release:
-	go install "github.com/goreleaser/goreleaser@latest"
+	go install "github.com/goreleaser/goreleaser/v2@latest"
 	goreleaser build --clean --snapshot
