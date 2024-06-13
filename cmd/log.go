@@ -148,7 +148,7 @@ func initLog() {
 
 	flags.StringToStringVarP(&labelsSelector, "selector", "l", nil, "Labels to filter pods")
 
-	flags.StringSliceVarP(&logFilters, "grep", "g", nil, "Regexp to filter log")
+	flags.StringArrayVarP(&logFilters, "grep", "g", nil, "Regexp to filter log")
 	flags.BoolVarP(&invertGrep, "invert-match", "v", false, "Invert regexp filter matching")
 
 	flags.String("grepColor", "", "Get logs only above given color (red > yellow > green)")
