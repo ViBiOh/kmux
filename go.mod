@@ -6,7 +6,7 @@ toolchain go1.22.2
 
 require (
 	github.com/fatih/color v1.17.0
-	github.com/spf13/cobra v1.8.0
+	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	k8s.io/api v0.30.2
 	k8s.io/apimachinery v0.30.2
