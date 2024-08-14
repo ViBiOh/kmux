@@ -204,8 +204,8 @@ func (l Logger) logOutputter(kube client.Kube, name, container string) output.Ou
 
 func (l Logger) outputLog(reader io.Reader, outputter output.Outputter) {
 	if !l.rawOutput {
-		outputter.Info(output.Yellow.Sprint("Log..."))
-		defer outputter.Info(output.Yellow.Sprint("Log ended."))
+		outputter.Warn("Log...")
+		defer outputter.Warn("Log ended.")
 	}
 
 	streamScanner := bufio.NewScanner(reader)
@@ -223,7 +223,7 @@ func (l Logger) outputLog(reader io.Reader, outputter output.Outputter) {
 		}
 
 		if len(l.logRegexes) == 0 {
-			outputter.Std(Format(text, colorOutputter))
+			outputter.Std("%s", Format(text, colorOutputter))
 
 			continue
 		}
@@ -241,7 +241,7 @@ func (l Logger) outputLog(reader io.Reader, outputter output.Outputter) {
 			greppedText = FormatGrep(greppedText, logRegexp, colorOutputter)
 		}
 
-		outputter.Std(greppedText)
+		outputter.Std("%s", greppedText)
 	}
 }
 

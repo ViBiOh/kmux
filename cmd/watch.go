@@ -134,7 +134,7 @@ func initWatchTable() *table.Table {
 	}
 
 	watchTable := table.New(defaultWidths)
-	output.Std("", watchTable.Format(content))
+	output.Std("", "%s", watchTable.Format(content))
 
 	return watchTable
 }
@@ -265,7 +265,7 @@ func outputWatch(watchTable *table.Table, contextName string, pod v1.Pod) {
 		content = append(content, table.NewCell(mapAsString(pod.GetAnnotations())))
 	}
 
-	output.Std("", watchTable.Format(content))
+	output.Std("", "%s", watchTable.Format(content))
 }
 
 func getPhaseCell(phase string) table.Cell {
