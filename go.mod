@@ -2,8 +2,6 @@ module github.com/ViBiOh/kmux
 
 go 1.23.0
 
-toolchain go1.23.0
-
 require (
 	github.com/fatih/color v1.17.0
 	github.com/spf13/cobra v1.8.1

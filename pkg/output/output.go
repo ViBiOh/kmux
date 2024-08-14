@@ -18,7 +18,7 @@ var (
 )
 
 func Std(prefix, format string, args ...any) {
-	outputContent(true, prefix, format, args...)
+	outputContent(true, prefix, fmt.Sprintf(format, args...))
 }
 
 func Warn(prefix, format string, args ...any) {
