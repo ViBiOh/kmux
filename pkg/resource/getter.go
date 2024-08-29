@@ -79,7 +79,11 @@ func GetPodSpec(ctx context.Context, kube client.Kube, resourceType, resourceNam
 func GetPodsSelector(ctx context.Context, kube client.Kube, resourceType, resourceName string) (namespace string, options metav1.ListOptions, postListFilter PodFilter, err error) {
 	switch resourceType {
 	case "ns", "namespace", "namespaces":
-		namespace = resourceName
+		if len(resourceName) == 0 {
+			namespace = kube.Namespace
+		} else {
+			namespace = resourceName
+		}
 
 		return
 

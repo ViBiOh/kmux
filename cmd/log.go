@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -69,7 +70,7 @@ var logCmd = &cobra.Command{
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) != 2 && len(labelsSelector) == 0 {
+		if len(args) != 2 && len(labelsSelector) == 0 && len(args) == 1 && !slices.Contains([]string{"ns", "namespace", "namespaces"}, args[0]) {
 			return errors.New("either labels or `TYPE NAME` args must be specified")
 		}
 
