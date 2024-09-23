@@ -228,11 +228,7 @@ func (l Logger) outputLog(reader io.Reader, outputter output.Outputter) {
 			continue
 		}
 
-		if l.invertRegexp {
-			if !l.noneMatch(text) {
-				continue
-			}
-		} else if !l.match(text) {
+		if !l.grepMatch(text) {
 			continue
 		}
 
@@ -245,22 +241,12 @@ func (l Logger) outputLog(reader io.Reader, outputter output.Outputter) {
 	}
 }
 
-func (l Logger) noneMatch(text string) bool {
+func (l Logger) grepMatch(text string) bool {
 	for _, logRegexp := range l.logRegexes {
 		if logRegexp.MatchString(text) {
-			return false
+			return !l.invertRegexp
 		}
 	}
 
-	return true
-}
-
-func (l Logger) match(text string) bool {
-	for _, logRegexp := range l.logRegexes {
-		if !logRegexp.MatchString(text) {
-			return false
-		}
-	}
-
-	return true
+	return false
 }
