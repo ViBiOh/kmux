@@ -248,5 +248,5 @@ func (l Logger) grepMatch(text string) bool {
 		}
 	}
 
-	return false
+	return l.invertRegexp
 }
