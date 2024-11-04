@@ -27,15 +27,17 @@ type Forwarder struct {
 	resourceType string
 	resourceName string
 	remotePort   string
+	limiter      uint
 	dryRun       bool
 }
 
-func NewForwarder(resourceType, resourceName, remotePort string, pool *tcpool.Pool) Forwarder {
+func NewForwarder(resourceType, resourceName, remotePort string, pool *tcpool.Pool, limiter uint) Forwarder {
 	return Forwarder{
 		resourceType: resourceType,
 		resourceName: resourceName,
 		remotePort:   remotePort,
 		pool:         pool,
+		limiter:      limiter,
 	}
 }
 
@@ -61,11 +63,15 @@ func (f Forwarder) Forward(ctx context.Context, kube client.Kube) error {
 	if err != nil {
 		return err
 	}
-
 	defer podWatcher.Stop()
 
-	var activeForwarding sync.Map
+	var podLimiter chan struct{}
+	if f.limiter > 0 {
+		podLimiter = make(chan struct{}, f.limiter)
+		defer close(podLimiter)
+	}
 
+	var activeForwarding sync.Map
 	forwarding := concurrent.NewSimple()
 
 	for event := range podWatcher.ResultChan() {
@@ -95,7 +101,15 @@ func (f Forwarder) Forward(ctx context.Context, kube client.Kube) error {
 			continue
 		}
 
-		f.handleForwardPod(kube, &activeForwarding, forwarding, *pod, remotePort)
+		if podLimiter == nil {
+			f.handleForwardPod(kube, &activeForwarding, forwarding, *pod, remotePort, podLimiter)
+		} else {
+			select {
+			case podLimiter <- struct{}{}:
+				f.handleForwardPod(kube, &activeForwarding, forwarding, *pod, remotePort, podLimiter)
+			default:
+			}
+		}
 	}
 
 	activeForwarding.Range(func(key, value any) bool {
@@ -180,12 +194,18 @@ func getForwardContainer(pod *v1.Pod, remotePort int32) (string, bool) {
 	return "", false
 }
 
-func (f Forwarder) handleForwardPod(kube client.Kube, activeForwarding *sync.Map, forwarding *concurrent.Simple, pod v1.Pod, remotePort int32) {
+func (f Forwarder) handleForwardPod(kube client.Kube, activeForwarding *sync.Map, forwarding *concurrent.Simple, pod v1.Pod, remotePort int32, podLimiter <-chan struct{}) {
 	stopChan := make(chan struct{})
 	activeForwarding.Store(pod.UID, stopChan)
 
 	forwarding.Go(func() {
 		defer activeForwarding.Delete(pod.UID)
+		defer func() {
+			select {
+			case <-podLimiter:
+			default:
+			}
+		}()
 
 		port, err := GetFreePort()
 		if err != nil {

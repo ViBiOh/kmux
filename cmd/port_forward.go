@@ -15,6 +15,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+var limiter uint
+
 var portForwardCmd = &cobra.Command{
 	Use:     "port-forward TYPE NAME [local_port:]remote_port",
 	Aliases: []string{"forward"},
@@ -82,7 +84,7 @@ var portForwardCmd = &cobra.Command{
 			cancel()
 		}()
 
-		forwarder := forward.NewForwarder(resourceType, resourceName, remotePort, pool)
+		forwarder := forward.NewForwarder(resourceType, resourceName, remotePort, pool, limiter)
 
 		clients.Execute(ctx, forwarder.Forward)
 
@@ -98,4 +100,5 @@ func initPortForward() {
 	flags := portForwardCmd.Flags()
 
 	flags.BoolVarP(&dryRun, "dry-run", "d", false, "Dry-run, print only pods")
+	flags.UintVarP(&limiter, "limit", "l", 0, "Limit forward to only n pods")
 }

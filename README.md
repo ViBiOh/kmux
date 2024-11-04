@@ -115,7 +115,8 @@ Aliases:
   port-forward, forward
 
 Flags:
-  -d, --dry-run   Dry-run, print only pods
+  -d, --dry-run      Dry-run, print only pods
+  -l, --limit uint   Limit forward to only n pods
 ```
 
 ### `watch`
