@@ -64,7 +64,7 @@ var logCmd = &cobra.Command{
 				return nil, cobra.ShellCompDirectiveError
 			}
 
-			return getCommonObjects(cmd.Context(), viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
+			return listObjects(cmd.Context(), viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
 		}
 
 		return nil, cobra.ShellCompDirectiveNoFileComp
@@ -114,13 +114,13 @@ var logCmd = &cobra.Command{
 			jsonColorKeys = append(jsonColorKeys, statusCodeKeys...)
 		}
 
-		var resourceType, resourceName string
+		var kind, name string
 		if len(args) > 1 {
-			resourceType = args[0]
-			resourceName = args[1]
+			kind = args[0]
+			name = args[1]
 		}
 
-		logger := log.NewLogger(resourceType, resourceName, labelsSelector, since).
+		logger := log.NewLogger(kind, name, labelsSelector, since).
 			WithDryRun(dryRun).
 			WithContainerRegexp(containerRegexp).
 			WithNoFollow(noFollow).

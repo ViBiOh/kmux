@@ -52,15 +52,15 @@ var restartCmd = &cobra.Command{
 				return nil, cobra.ShellCompDirectiveError
 			}
 
-			return getCommonObjects(cmd.Context(), viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
+			return listObjects(cmd.Context(), viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
 		}
 
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	Args: cobra.MatchAll(cobra.ExactArgs(2), cobra.OnlyValidArgs),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		resourceType := args[0]
-		resourceName := args[1]
+		kind := args[0]
+		name := args[1]
 
 		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
@@ -80,15 +80,15 @@ var restartCmd = &cobra.Command{
 		}
 
 		clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
-			switch resourceType {
+			switch kind {
 			case "ds", "daemonset", "daemonsets":
-				_, err := kube.AppsV1().DaemonSets(kube.Namespace).Patch(ctx, resourceName, types.MergePatchType, payload, v1.PatchOptions{})
+				_, err := kube.AppsV1().DaemonSets(kube.Namespace).Patch(ctx, name, types.MergePatchType, payload, v1.PatchOptions{})
 				return err
 			case "deploy", "deployment", "deployments":
-				_, err := kube.AppsV1().Deployments(kube.Namespace).Patch(ctx, resourceName, types.MergePatchType, payload, v1.PatchOptions{})
+				_, err := kube.AppsV1().Deployments(kube.Namespace).Patch(ctx, name, types.MergePatchType, payload, v1.PatchOptions{})
 				return err
 			case "job", "jobs":
-				job, err := kube.BatchV1().Jobs(kube.Namespace).Get(ctx, resourceName, v1.GetOptions{})
+				job, err := kube.BatchV1().Jobs(kube.Namespace).Get(ctx, name, v1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -96,7 +96,7 @@ var restartCmd = &cobra.Command{
 				job.Spec.Selector = nil
 				job.Spec.Template.ObjectMeta.Labels = nil
 
-				if err = kube.BatchV1().Jobs(kube.Namespace).Delete(ctx, resourceName, v1.DeleteOptions{}); err != nil {
+				if err = kube.BatchV1().Jobs(kube.Namespace).Delete(ctx, name, v1.DeleteOptions{}); err != nil {
 					return err
 				}
 
@@ -105,10 +105,10 @@ var restartCmd = &cobra.Command{
 				_, err = kube.BatchV1().Jobs(kube.Namespace).Create(ctx, job, v1.CreateOptions{})
 				return err
 			case "sts", "statefulset", "statefulsets":
-				_, err := kube.AppsV1().StatefulSets(kube.Namespace).Patch(ctx, resourceName, types.MergePatchType, payload, v1.PatchOptions{})
+				_, err := kube.AppsV1().StatefulSets(kube.Namespace).Patch(ctx, name, types.MergePatchType, payload, v1.PatchOptions{})
 				return err
 			default:
-				return fmt.Errorf("unhandled resource type `%s` for restart", resourceType)
+				return fmt.Errorf("unhandled resource type `%s` for restart", kind)
 			}
 		})
 

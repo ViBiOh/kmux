@@ -13,10 +13,10 @@ import (
 
 type PodFilter func(context.Context, client.Kube, v1.Pod) bool
 
-func GetPodSpec(ctx context.Context, kube client.Kube, resourceType, resourceName string) (v1.PodSpec, error) {
-	switch resourceType {
+func GetPodSpec(ctx context.Context, kube client.Kube, kind, name string) (v1.PodSpec, error) {
+	switch kind {
 	case "cj", "cronjob", "cronjobs":
-		item, err := kube.BatchV1().CronJobs(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
+		item, err := kube.BatchV1().CronJobs(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return v1.PodSpec{}, err
 		}
@@ -24,7 +24,7 @@ func GetPodSpec(ctx context.Context, kube client.Kube, resourceType, resourceNam
 		return item.Spec.JobTemplate.Spec.Template.Spec, nil
 
 	case "ds", "daemonset", "daemonsets":
-		item, err := kube.AppsV1().DaemonSets(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
+		item, err := kube.AppsV1().DaemonSets(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return v1.PodSpec{}, err
 		}
@@ -32,7 +32,7 @@ func GetPodSpec(ctx context.Context, kube client.Kube, resourceType, resourceNam
 		return item.Spec.Template.Spec, nil
 
 	case "deploy", "deployment", "deployments":
-		item, err := kube.AppsV1().Deployments(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
+		item, err := kube.AppsV1().Deployments(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return v1.PodSpec{}, err
 		}
@@ -40,7 +40,7 @@ func GetPodSpec(ctx context.Context, kube client.Kube, resourceType, resourceNam
 		return item.Spec.Template.Spec, nil
 
 	case "job", "jobs":
-		item, err := kube.BatchV1().Jobs(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
+		item, err := kube.BatchV1().Jobs(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return v1.PodSpec{}, err
 		}
@@ -48,7 +48,7 @@ func GetPodSpec(ctx context.Context, kube client.Kube, resourceType, resourceNam
 		return item.Spec.Template.Spec, nil
 
 	case "po", "pod", "pods":
-		item, err := kube.CoreV1().Pods(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
+		item, err := kube.CoreV1().Pods(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return v1.PodSpec{}, err
 		}
@@ -56,7 +56,7 @@ func GetPodSpec(ctx context.Context, kube client.Kube, resourceType, resourceNam
 		return item.Spec, nil
 
 	case "rs", "replicaset", "replicasets":
-		item, err := kube.AppsV1().ReplicaSets(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
+		item, err := kube.AppsV1().ReplicaSets(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return v1.PodSpec{}, err
 		}
@@ -64,7 +64,7 @@ func GetPodSpec(ctx context.Context, kube client.Kube, resourceType, resourceNam
 		return item.Spec.Template.Spec, nil
 
 	case "sts", "statefulset", "statefulsets":
-		item, err := kube.AppsV1().StatefulSets(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
+		item, err := kube.AppsV1().StatefulSets(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return v1.PodSpec{}, err
 		}
@@ -72,17 +72,17 @@ func GetPodSpec(ctx context.Context, kube client.Kube, resourceType, resourceNam
 		return item.Spec.Template.Spec, nil
 
 	default:
-		return v1.PodSpec{}, unhandledError(resourceType)
+		return v1.PodSpec{}, unhandledError(kind)
 	}
 }
 
-func GetPodsSelector(ctx context.Context, kube client.Kube, resourceType, resourceName string) (namespace string, options metav1.ListOptions, postListFilter PodFilter, err error) {
-	switch resourceType {
+func GetPodsSelector(ctx context.Context, kube client.Kube, kind, name string) (namespace string, options metav1.ListOptions, postListFilter PodFilter, err error) {
+	switch kind {
 	case "ns", "namespace", "namespaces":
-		if len(resourceName) == 0 {
+		if len(name) == 0 {
 			namespace = kube.Namespace
 		} else {
-			namespace = resourceName
+			namespace = name
 		}
 
 		return
@@ -90,13 +90,13 @@ func GetPodsSelector(ctx context.Context, kube client.Kube, resourceType, resour
 	case "po", "pod", "pods",
 		"no", "node", "nodes":
 		namespace = kube.Namespace
-		options.FieldSelector, err = podFieldSelectorGetter(resourceType, resourceName)
+		options.FieldSelector, err = podFieldSelectorGetter(kind, name)
 
 		return
 
 	case "svc", "service", "services":
 		var service *v1.Service
-		service, err = kube.CoreV1().Services(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
+		service, err = kube.CoreV1().Services(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			err = fmt.Errorf("get services: %w", err)
 
@@ -110,7 +110,7 @@ func GetPodsSelector(ctx context.Context, kube client.Kube, resourceType, resour
 
 	case "cj", "cronjob", "cronjobs":
 		var cronjob *batchv1.CronJob
-		cronjob, err = kube.BatchV1().CronJobs(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
+		cronjob, err = kube.BatchV1().CronJobs(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			err = fmt.Errorf("get cronjob: %w", err)
 
@@ -146,7 +146,7 @@ func GetPodsSelector(ctx context.Context, kube client.Kube, resourceType, resour
 
 	default:
 		var labelSelector *metav1.LabelSelector
-		labelSelector, err = podLabelSelectorGetter(ctx, kube, resourceType, resourceName)
+		labelSelector, err = podLabelSelectorGetter(ctx, kube, kind, name)
 		if err != nil {
 			return
 		}
@@ -158,10 +158,10 @@ func GetPodsSelector(ctx context.Context, kube client.Kube, resourceType, resour
 	}
 }
 
-func podLabelSelectorGetter(ctx context.Context, kube client.Kube, resourceType, resourceName string) (*metav1.LabelSelector, error) {
-	switch resourceType {
+func podLabelSelectorGetter(ctx context.Context, kube client.Kube, kind, name string) (*metav1.LabelSelector, error) {
+	switch kind {
 	case "ds", "daemonset", "daemonsets":
-		item, err := kube.AppsV1().DaemonSets(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
+		item, err := kube.AppsV1().DaemonSets(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -169,7 +169,7 @@ func podLabelSelectorGetter(ctx context.Context, kube client.Kube, resourceType,
 		return item.Spec.Selector, nil
 
 	case "deploy", "deployment", "deployments":
-		item, err := kube.AppsV1().Deployments(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
+		item, err := kube.AppsV1().Deployments(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -177,7 +177,7 @@ func podLabelSelectorGetter(ctx context.Context, kube client.Kube, resourceType,
 		return item.Spec.Selector, nil
 
 	case "job", "jobs":
-		item, err := kube.BatchV1().Jobs(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
+		item, err := kube.BatchV1().Jobs(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -185,7 +185,7 @@ func podLabelSelectorGetter(ctx context.Context, kube client.Kube, resourceType,
 		return item.Spec.Selector, nil
 
 	case "sts", "statefulset", "statefulsets":
-		item, err := kube.AppsV1().StatefulSets(kube.Namespace).Get(ctx, resourceName, metav1.GetOptions{})
+		item, err := kube.AppsV1().StatefulSets(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -193,20 +193,20 @@ func podLabelSelectorGetter(ctx context.Context, kube client.Kube, resourceType,
 		return item.Spec.Selector, nil
 
 	default:
-		return nil, unhandledError(resourceType)
+		return nil, unhandledError(kind)
 	}
 }
 
-func podFieldSelectorGetter(resourceType, resourceName string) (string, error) {
-	switch resourceType {
+func podFieldSelectorGetter(kind, name string) (string, error) {
+	switch kind {
 	case "po", "pod", "pods":
-		return fmt.Sprintf("metadata.name=%s", resourceName), nil
+		return fmt.Sprintf("metadata.name=%s", name), nil
 
 	case "no", "node", "nodes":
-		return fmt.Sprintf("spec.nodeName=%s", resourceName), nil
+		return fmt.Sprintf("spec.nodeName=%s", name), nil
 
 	default:
-		return "", unhandledError(resourceType)
+		return "", unhandledError(kind)
 	}
 }
 
@@ -224,6 +224,6 @@ func labelSelectorFromMaps(labels map[string]string) string {
 	return labelSelector.String()
 }
 
-func unhandledError(resourceType string) error {
-	return fmt.Errorf("unhandled resource type `%s`", resourceType)
+func unhandledError(kind string) error {
+	return fmt.Errorf("unhandled resource type `%s`", kind)
 }

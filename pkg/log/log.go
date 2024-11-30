@@ -24,8 +24,8 @@ type Logger struct {
 	logRegexes      []*regexp.Regexp
 	containerRegexp *regexp.Regexp
 	colorFilter     *color.Color
-	resourceType    string
-	resourceName    string
+	kind            string
+	name            string
 	jsonColorKeys   []string
 	since           int64
 	rawOutput       bool
@@ -34,12 +34,12 @@ type Logger struct {
 	noFollow        bool
 }
 
-func NewLogger(resourceType, resourceName string, selector map[string]string, since time.Duration) Logger {
+func NewLogger(kind, name string, selector map[string]string, since time.Duration) Logger {
 	return Logger{
-		resourceType: resourceType,
-		resourceName: resourceName,
-		selector:     selector,
-		since:        int64(since.Seconds()),
+		kind:     kind,
+		name:     name,
+		selector: selector,
+		since:    int64(since.Seconds()),
 	}
 }
 
@@ -92,7 +92,7 @@ func (l Logger) WithRawOutput(rawOutput bool) Logger {
 }
 
 func (l Logger) Log(ctx context.Context, kube client.Kube) error {
-	podWatcher, err := resource.WatchPods(ctx, kube, l.resourceType, l.resourceName, l.selector, l.dryRun || l.noFollow)
+	podWatcher, err := resource.WatchPods(ctx, kube, l.kind, l.name, l.selector, l.dryRun || l.noFollow)
 	if err != nil {
 		return fmt.Errorf("watch pods: %w", err)
 	}

@@ -40,15 +40,15 @@ var imageCmd = &cobra.Command{
 				return nil, cobra.ShellCompDirectiveError
 			}
 
-			return getCommonObjects(cmd.Context(), viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
+			return listObjects(cmd.Context(), viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
 		}
 
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	Args: cobra.MatchAll(cobra.ExactArgs(2), cobra.OnlyValidArgs),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		resourceType := args[0]
-		resourceName := args[1]
+		kind := args[0]
+		name := args[1]
 
 		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
@@ -68,7 +68,7 @@ var imageCmd = &cobra.Command{
 		}
 
 		clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
-			podSpec, err := resource.GetPodSpec(ctx, kube, resourceType, resourceName)
+			podSpec, err := resource.GetPodSpec(ctx, kube, kind, name)
 			if err != nil {
 				return err
 			}

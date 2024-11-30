@@ -40,15 +40,15 @@ var envCmd = &cobra.Command{
 				return nil, cobra.ShellCompDirectiveError
 			}
 
-			return getCommonObjects(cmd.Context(), viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
+			return listObjects(cmd.Context(), viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
 		}
 
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	Args: cobra.MatchAll(cobra.ExactArgs(2), cobra.OnlyValidArgs),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		resourceType := args[0]
-		resourceName := args[1]
+		kind := args[0]
+		name := args[1]
 
 		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
@@ -67,7 +67,7 @@ var envCmd = &cobra.Command{
 			}
 		}
 
-		envGetter := env.NewEnvGetter(resourceType, resourceName).
+		envGetter := env.NewEnvGetter(kind, name).
 			WithContainerRegexp(containerRegexp)
 
 		clients.Execute(ctx, envGetter.Get)

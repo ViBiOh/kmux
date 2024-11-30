@@ -6,10 +6,9 @@ import (
 
 	"github.com/ViBiOh/kmux/pkg/client"
 	"github.com/ViBiOh/kmux/pkg/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func getCommonNamespace(kube client.Kube, namespace string) string {
+func getNamespace(kube client.Kube, namespace string) string {
 	if len(namespace) != 0 {
 		return namespace
 	}
@@ -21,25 +20,25 @@ func getCommonNamespace(kube client.Kube, namespace string) string {
 	return ""
 }
 
-func getCommonObjects(ctx context.Context, namespace string, lister resource.Lister) []string {
+func listObjects(ctx context.Context, namespace string, lister resource.Lister) []string {
 	output := make(chan string, len(clients))
-	successChan := make(chan bool, len(clients))
+	successChan := make(chan struct{}, len(clients))
 
 	go func() {
 		defer close(output)
 		defer close(successChan)
 
 		clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
-			items, err := lister(ctx, kube, getCommonNamespace(kube, namespace), metav1.ListOptions{})
+			items, err := lister(ctx, kube, getNamespace(kube, namespace))
 			if err != nil {
 				return err
 			}
 
-			for _, deployment := range items {
-				output <- deployment.GetName()
+			for _, item := range items {
+				output <- item
 			}
 
-			successChan <- true
+			successChan <- struct{}{}
 
 			return nil
 		})

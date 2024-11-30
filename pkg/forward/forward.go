@@ -23,21 +23,21 @@ import (
 )
 
 type Forwarder struct {
-	pool         *tcpool.Pool
-	resourceType string
-	resourceName string
-	remotePort   string
-	limiter      uint
-	dryRun       bool
+	pool       *tcpool.Pool
+	kind       string
+	name       string
+	remotePort string
+	limiter    uint
+	dryRun     bool
 }
 
-func NewForwarder(resourceType, resourceName, remotePort string, pool *tcpool.Pool, limiter uint) Forwarder {
+func NewForwarder(kind, name, remotePort string, pool *tcpool.Pool, limiter uint) Forwarder {
 	return Forwarder{
-		resourceType: resourceType,
-		resourceName: resourceName,
-		remotePort:   remotePort,
-		pool:         pool,
-		limiter:      limiter,
+		kind:       kind,
+		name:       name,
+		remotePort: remotePort,
+		pool:       pool,
+		limiter:    limiter,
 	}
 }
 
@@ -50,16 +50,16 @@ func (f Forwarder) WithDryRun(dryRun bool) Forwarder {
 func (f Forwarder) Forward(ctx context.Context, kube client.Kube) error {
 	remotePort := f.remotePort
 
-	if resource.IsService(f.resourceType) {
+	if resource.IsService(f.kind) {
 		var err error
 
-		remotePort, err = getTargetPort(ctx, kube, f.resourceName, remotePort)
+		remotePort, err = getTargetPort(ctx, kube, f.name, remotePort)
 		if err != nil {
 			kube.Err("get target port: %s", err)
 		}
 	}
 
-	podWatcher, err := resource.WatchPods(ctx, kube, f.resourceType, f.resourceName, nil, f.dryRun)
+	podWatcher, err := resource.WatchPods(ctx, kube, f.kind, f.name, nil, f.dryRun)
 	if err != nil {
 		return err
 	}

@@ -199,7 +199,7 @@ func completeNamespace(cmd *cobra.Command, _ []string, _ string) ([]string, cobr
 		return nil, cobra.ShellCompDirectiveError
 	}
 
-	return getCommonObjects(cmd.Context(), "", lister), cobra.ShellCompDirectiveDefault
+	return listObjects(cmd.Context(), "", lister), cobra.ShellCompDirectiveDefault
 }
 
 func contains(arr []string, value string) bool {

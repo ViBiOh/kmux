@@ -26,15 +26,15 @@ func (dw WrappedWatcher) ResultChan() <-chan watch.Event {
 	return dw.pods
 }
 
-func WatchPods(ctx context.Context, kube client.Kube, resourceType, resourceName string, labelSelector map[string]string, dryRun bool) (watch.Interface, error) {
+func WatchPods(ctx context.Context, kube client.Kube, kind, name string, labelSelector map[string]string, dryRun bool) (watch.Interface, error) {
 	var listOptions metav1.ListOptions
 	var postListFilter PodFilter
 	var err error
 
 	namespace := kube.Namespace
 
-	if len(resourceType) > 0 && len(resourceName) > 0 {
-		namespace, listOptions, postListFilter, err = GetPodsSelector(ctx, kube, resourceType, resourceName)
+	if len(kind) > 0 && len(name) > 0 {
+		namespace, listOptions, postListFilter, err = GetPodsSelector(ctx, kube, kind, name)
 		if err != nil {
 			return nil, fmt.Errorf("get list options: %w", err)
 		}

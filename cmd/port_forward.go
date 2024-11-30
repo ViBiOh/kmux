@@ -43,15 +43,15 @@ var portForwardCmd = &cobra.Command{
 				return nil, cobra.ShellCompDirectiveError
 			}
 
-			return getCommonObjects(cmd.Context(), viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
+			return listObjects(cmd.Context(), viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
 		}
 
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	Args: cobra.MatchAll(cobra.ExactArgs(3), cobra.OnlyValidArgs),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		resourceType := args[0]
-		resourceName := args[1]
+		kind := args[0]
+		name := args[1]
 		rawPort := args[2]
 
 		ports := strings.SplitN(rawPort, ":", 2)
@@ -84,7 +84,7 @@ var portForwardCmd = &cobra.Command{
 			cancel()
 		}()
 
-		forwarder := forward.NewForwarder(resourceType, resourceName, remotePort, pool, limiter)
+		forwarder := forward.NewForwarder(kind, name, remotePort, pool, limiter)
 
 		clients.Execute(ctx, forwarder.Forward)
 

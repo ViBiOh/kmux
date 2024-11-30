@@ -43,14 +43,14 @@ func (ev envValue) String() string {
 
 type EnvGetter struct {
 	containerRegexp *regexp.Regexp
-	resourceType    string
-	resourceName    string
+	kind            string
+	name            string
 }
 
-func NewEnvGetter(resourceType, resourceName string) EnvGetter {
+func NewEnvGetter(kind, name string) EnvGetter {
 	return EnvGetter{
-		resourceType: resourceType,
-		resourceName: resourceName,
+		kind: kind,
+		name: name,
 	}
 }
 
@@ -61,12 +61,12 @@ func (eg EnvGetter) WithContainerRegexp(containerRegexp *regexp.Regexp) EnvGette
 }
 
 func (eg EnvGetter) Get(ctx context.Context, kube client.Kube) error {
-	podSpec, err := resource.GetPodSpec(ctx, kube, eg.resourceType, eg.resourceName)
+	podSpec, err := resource.GetPodSpec(ctx, kube, eg.kind, eg.name)
 	if err != nil {
 		return err
 	}
 
-	pods, err := resource.ListPods(ctx, kube, eg.resourceType, eg.resourceName)
+	pods, err := resource.ListPods(ctx, kube, eg.kind, eg.name)
 	if err != nil {
 		return err
 	}
