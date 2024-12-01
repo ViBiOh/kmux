@@ -101,15 +101,7 @@ func (f Forwarder) Forward(ctx context.Context, kube client.Kube) error {
 			continue
 		}
 
-		if podLimiter == nil {
-			f.handleForwardPod(kube, &activeForwarding, forwarding, *pod, remotePort, podLimiter)
-		} else {
-			select {
-			case podLimiter <- struct{}{}:
-				f.handleForwardPod(kube, &activeForwarding, forwarding, *pod, remotePort, podLimiter)
-			default:
-			}
-		}
+		f.handleForwardPod(kube, &activeForwarding, forwarding, *pod, remotePort, podLimiter)
 	}
 
 	activeForwarding.Range(func(key, value any) bool {
@@ -194,18 +186,21 @@ func getForwardContainer(pod *v1.Pod, remotePort int32) (string, bool) {
 	return "", false
 }
 
-func (f Forwarder) handleForwardPod(kube client.Kube, activeForwarding *sync.Map, forwarding *concurrent.Simple, pod v1.Pod, remotePort int32, podLimiter <-chan struct{}) {
+func (f Forwarder) handleForwardPod(kube client.Kube, activeForwarding *sync.Map, forwarding *concurrent.Simple, pod v1.Pod, remotePort int32, podLimiter chan struct{}) {
 	stopChan := make(chan struct{})
 	activeForwarding.Store(pod.UID, stopChan)
 
 	forwarding.Go(func() {
 		defer activeForwarding.Delete(pod.UID)
-		defer func() {
+
+		if podLimiter != nil {
 			select {
-			case <-podLimiter:
-			default:
+			case podLimiter <- struct{}{}:
+				defer func() { <-podLimiter }()
+			case <-stopChan:
+				return
 			}
-		}()
+		}
 
 		port, err := GetFreePort()
 		if err != nil {
