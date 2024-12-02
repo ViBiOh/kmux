@@ -247,16 +247,16 @@ func listenPortForward(kube client.Kube, pod v1.Pod, stopChan chan struct{}, loc
 func GetFreePort() (int32, error) {
 	addr, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("resolve local address: %w", err)
 	}
 
 	listener, err := net.ListenTCP("tcp", addr)
 	if err != nil {
-		return 0, fmt.Errorf("listen tcp: %s", err)
+		return 0, fmt.Errorf("listen tcp: %w", err)
 	}
 
 	if closeErr := listener.Close(); closeErr != nil {
-		output.Err("", "close free port listener: %s", err)
+		return 0, fmt.Errorf("close listener: %w", err)
 	}
 
 	return int32(listener.Addr().(*net.TCPAddr).Port), nil
