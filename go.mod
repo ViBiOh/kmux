@@ -6,9 +6,9 @@ require (
 	github.com/fatih/color v1.18.0
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
-	k8s.io/api v0.32.0
-	k8s.io/apimachinery v0.32.0
-	k8s.io/client-go v0.32.0
+	k8s.io/api v0.32.1
+	k8s.io/apimachinery v0.32.1
+	k8s.io/client-go v0.32.1
 )
 
 require (
