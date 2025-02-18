@@ -9,6 +9,8 @@ updates:
     commit-message:
       prefix: ci
       include: scope
+    assignees:
+      - ViBiOh
 
   - package-ecosystem: gomod
     directory: /
@@ -17,6 +19,8 @@ updates:
     commit-message:
       prefix: chore
       include: scope
+    assignees:
+      - ViBiOh
     groups:
       kubernetes:
         patterns:
