@@ -210,7 +210,7 @@ func outputWatch(watchTable *table.Table, contextName string, pod v1.Pod) {
 		content = append(content, table.NewCell(pod.Namespace))
 	}
 
-	phase, ready, restart, lastRestartDate := getPodStatus(pod)
+	phase, ready, total, restart, lastRestartDate := getPodStatus(pod)
 
 	var since string
 	if pod.Status.StartTime != nil {
@@ -228,7 +228,6 @@ func outputWatch(watchTable *table.Table, contextName string, pod v1.Pod) {
 	}
 
 	var readyColor *color.Color
-	total := len(pod.Status.ContainerStatuses)
 	if ready != uint(total) {
 		readyColor = output.Yellow
 	} else {
@@ -297,10 +296,20 @@ func mapAsString(labels map[string]string) string {
 	return strings.Join(values, ",")
 }
 
-// from https://github.com/kubernetes/kubernetes/blob/v1.24.3/pkg/printers/internalversion/printers.go#L743
-func getPodStatus(pod v1.Pod) (string, uint, uint, time.Time) {
+// from https://github.com/kubernetes/kubernetes/blob/v1.32.3/pkg/printers/internalversion/printers.go#L865
+
+func IsRestartableInitContainer(initContainer *v1.Container) bool {
+	if initContainer == nil || initContainer.RestartPolicy == nil {
+		return false
+	}
+	return *initContainer.RestartPolicy == v1.ContainerRestartPolicyAlways
+}
+
+func getPodStatus(pod v1.Pod) (string, uint, int, uint, time.Time) {
 	var ready uint
 	var restart uint
+
+	total := len(pod.Spec.Containers)
 	lastRestartDate := metav1.NewTime(time.Time{})
 
 	reason := string(pod.Status.Phase)
@@ -310,9 +319,16 @@ func getPodStatus(pod v1.Pod) (string, uint, uint, time.Time) {
 
 	initializing := false
 
+	initContainers := make(map[string]*v1.Container)
+	for i := range pod.Spec.InitContainers {
+		initContainers[pod.Spec.InitContainers[i].Name] = &pod.Spec.InitContainers[i]
+		if IsRestartableInitContainer(&pod.Spec.InitContainers[i]) {
+			total++
+		}
+	}
+
 	for i := range pod.Status.InitContainerStatuses {
 		container := pod.Status.InitContainerStatuses[i]
-
 		restart += uint(container.RestartCount)
 
 		if container.LastTerminationState.Terminated != nil {
@@ -324,6 +340,13 @@ func getPodStatus(pod v1.Pod) (string, uint, uint, time.Time) {
 
 		switch {
 		case container.State.Terminated != nil && container.State.Terminated.ExitCode == 0:
+			continue
+
+		case IsRestartableInitContainer(initContainers[container.Name]) &&
+			container.Started != nil && *container.Started:
+			if container.Ready {
+				ready++
+			}
 			continue
 
 		case container.State.Terminated != nil:
@@ -408,7 +431,7 @@ func getPodStatus(pod v1.Pod) (string, uint, uint, time.Time) {
 		reason = "Terminating"
 	}
 
-	return reason, ready, restart, lastRestartDate.Time
+	return reason, ready, total, restart, lastRestartDate.Time
 }
 
 func getPodWide(pod v1.Pod) (string, string, string, string) {
