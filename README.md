@@ -180,3 +180,17 @@ Usage:
 Flags:
   -c, --container string   Filter container's name by regexp, default to all containers
 ```
+
+### `scale`
+
+`scale` changes the `replicas` field on a replicable ressource (deployment, replicaset, statefulset). It works by using a `scale factor`, you don't need to know the current replicas count.
+
+```bash
+Scale a resource by a given factor
+
+Usage:
+  kmux scale TYPE NAME FACTOR [flags]
+
+Flags:
+  -f, --factor float64   Scale factor, e.g. -1 to go down to zero, 0.5 for 50%, 1 to double the size (default 0)
+```

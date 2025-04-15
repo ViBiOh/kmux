@@ -6,12 +6,72 @@ import (
 	"strings"
 
 	"github.com/ViBiOh/kmux/pkg/client"
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type PodFilter func(context.Context, client.Kube, v1.Pod) bool
+
+type Replicable interface {
+	GetReplicas() *int32
+}
+
+type ReplicableDeployment struct {
+	appsv1.DeploymentSpec
+}
+
+func (rd ReplicableDeployment) GetReplicas() *int32 {
+	return rd.DeploymentSpec.Replicas
+}
+
+type ReplicableReplicaSet struct {
+	appsv1.ReplicaSetSpec
+}
+
+func (rd ReplicableReplicaSet) GetReplicas() *int32 {
+	return rd.ReplicaSetSpec.Replicas
+}
+
+type ReplicableStatefulSet struct {
+	appsv1.StatefulSetSpec
+}
+
+func (rd ReplicableStatefulSet) GetReplicas() *int32 {
+	return rd.StatefulSetSpec.Replicas
+}
+
+func GetReplicable(ctx context.Context, kube client.Kube, kind, name string) (Replicable, error) {
+	switch kind {
+	case "deploy", "deployment", "deployments":
+		item, err := kube.AppsV1().Deployments(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		return ReplicableDeployment{item.Spec}, nil
+
+	case "rs", "replicaset", "replicasets":
+		item, err := kube.AppsV1().ReplicaSets(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		return ReplicableReplicaSet{item.Spec}, nil
+
+	case "sts", "statefulset", "statefulsets":
+		item, err := kube.AppsV1().StatefulSets(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		return ReplicableStatefulSet{item.Spec}, nil
+
+	default:
+		return nil, unhandledError(kind)
+	}
+}
 
 func GetPodSpec(ctx context.Context, kube client.Kube, kind, name string) (v1.PodSpec, error) {
 	switch kind {

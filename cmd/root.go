@@ -166,6 +166,9 @@ func init() {
 
 	initLog()
 	rootCmd.AddCommand(logCmd)
+
+	initScale()
+	rootCmd.AddCommand(scaleCmd)
 }
 
 func completeContext(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
