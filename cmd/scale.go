@@ -14,7 +14,10 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var scaleFactor float64
+var (
+	scaleFactor float64
+	scaleForce  bool
+)
 
 var scaleCmd = &cobra.Command{
 	Use:   "scale TYPE NAME",
@@ -57,8 +60,12 @@ var scaleCmd = &cobra.Command{
 			cancel()
 		}()
 
-		if scaleFactor == 0 {
-			return errors.New("no scale factor provided")
+		if scaleFactor == 1 {
+			return nil
+		}
+
+		if scaleFactor == 0 && !scaleForce {
+			return errors.New("Use `--force` to confirm downscaling to zero pods")
 		}
 
 		clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
@@ -68,7 +75,7 @@ var scaleCmd = &cobra.Command{
 			}
 
 			oldReplicas := scale.Spec.Replicas
-			scale.Spec.Replicas = scale.Spec.Replicas + int32(math.Ceil(float64(oldReplicas)*scaleFactor))
+			scale.Spec.Replicas = int32(math.Ceil(float64(oldReplicas) * scaleFactor))
 
 			kube.Std("Scale from %d to %d", oldReplicas, scale.Spec.Replicas)
 
@@ -94,5 +101,6 @@ var scaleCmd = &cobra.Command{
 func initScale() {
 	flags := scaleCmd.Flags()
 
-	flags.Float64VarP(&scaleFactor, "factor", "f", 0, "Scale factor, e.g. -1 to go down to zero, 0.5 for 50%, 1 to double the size")
+	flags.Float64VarP(&scaleFactor, "factor", "", 1, "Scale factor, e.g. 0 to go down to zero, 1.5 for 50% more, 2 to double the size")
+	flags.BoolVarP(&scaleForce, "force", "", false, "Acknowledge downscaling to zero")
 }

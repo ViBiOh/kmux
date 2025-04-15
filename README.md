@@ -189,8 +189,9 @@ Flags:
 Scale a resource by a given factor
 
 Usage:
-  kmux scale TYPE NAME FACTOR [flags]
+  kmux scale TYPE NAME [flags]
 
 Flags:
-  -f, --factor float64   Scale factor, e.g. -1 to go down to zero, 0.5 for 50%, 1 to double the size (default 0)
+      --factor float   Scale factor, e.g. 0 to go down to zero, 1.5 for 50% more, 2 to double the size (default 1)
+      --force          Acknowledge downscaling to zero
 ```
