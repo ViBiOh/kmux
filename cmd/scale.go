@@ -2,9 +2,7 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"math"
 	"strings"
 	"syscall"
@@ -14,16 +12,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 var scaleFactor float64
-
-type scalePatch struct {
-	Spec struct {
-		Replicas int32 `json:"replicas"`
-	} `json:"spec"`
-}
 
 var scaleCmd = &cobra.Command{
 	Use:   "scale TYPE NAME",
@@ -71,32 +62,25 @@ var scaleCmd = &cobra.Command{
 		}
 
 		clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
-			replicable, err := resource.GetReplicable(ctx, kube, kind, name)
+			scale, err := resource.GetScale(ctx, kube, kind, name)
 			if err != nil {
 				return err
 			}
 
-			replicas := *replicable.GetReplicas()
+			oldReplicas := scale.Spec.Replicas
+			scale.Spec.Replicas = scale.Spec.Replicas + int32(math.Ceil(float64(oldReplicas)*scaleFactor))
 
-			var patch scalePatch
-			patch.Spec.Replicas = replicas + int32(math.Ceil(float64(replicas)*scaleFactor))
-
-			payload, err := json.Marshal(patch)
-			if err != nil {
-				return fmt.Errorf("marshal patch: %w", err)
-			}
-
-			kube.Std("Scale from %d to %d", replicas, patch.Spec.Replicas)
+			kube.Std("Scale from %d to %d", oldReplicas, scale.Spec.Replicas)
 
 			switch kind {
 			case "deploy", "deployment", "deployments":
-				_, err := kube.AppsV1().Deployments(kube.Namespace).Patch(ctx, name, types.MergePatchType, payload, v1.PatchOptions{})
+				_, err := kube.AppsV1().Deployments(kube.Namespace).UpdateScale(ctx, name, scale, v1.UpdateOptions{})
 				return err
 			case "rs", "replicaset", "replicasets":
-				_, err := kube.AppsV1().ReplicaSets(kube.Namespace).Patch(ctx, name, types.MergePatchType, payload, v1.PatchOptions{})
+				_, err := kube.AppsV1().ReplicaSets(kube.Namespace).UpdateScale(ctx, name, scale, v1.UpdateOptions{})
 				return err
 			case "sts", "statefulset", "statefulsets":
-				_, err := kube.AppsV1().StatefulSets(kube.Namespace).Patch(ctx, name, types.MergePatchType, payload, v1.PatchOptions{})
+				_, err := kube.AppsV1().StatefulSets(kube.Namespace).UpdateScale(ctx, name, scale, v1.UpdateOptions{})
 				return err
 			}
 

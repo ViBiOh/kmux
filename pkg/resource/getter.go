@@ -7,6 +7,7 @@ import (
 
 	"github.com/ViBiOh/kmux/pkg/client"
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,31 +43,16 @@ func (rd ReplicableStatefulSet) GetReplicas() *int32 {
 	return rd.StatefulSetSpec.Replicas
 }
 
-func GetReplicable(ctx context.Context, kube client.Kube, kind, name string) (Replicable, error) {
+func GetScale(ctx context.Context, kube client.Kube, kind, name string) (*autoscalingv1.Scale, error) {
 	switch kind {
 	case "deploy", "deployment", "deployments":
-		item, err := kube.AppsV1().Deployments(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
-			return nil, err
-		}
-
-		return ReplicableDeployment{item.Spec}, nil
+		return kube.AppsV1().Deployments(kube.Namespace).GetScale(ctx, name, metav1.GetOptions{})
 
 	case "rs", "replicaset", "replicasets":
-		item, err := kube.AppsV1().ReplicaSets(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
-			return nil, err
-		}
-
-		return ReplicableReplicaSet{item.Spec}, nil
+		return kube.AppsV1().ReplicaSets(kube.Namespace).GetScale(ctx, name, metav1.GetOptions{})
 
 	case "sts", "statefulset", "statefulsets":
-		item, err := kube.AppsV1().StatefulSets(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
-			return nil, err
-		}
-
-		return ReplicableStatefulSet{item.Spec}, nil
+		return kube.AppsV1().StatefulSets(kube.Namespace).GetScale(ctx, name, metav1.GetOptions{})
 
 	default:
 		return nil, unhandledError(kind)
