@@ -75,7 +75,7 @@ var scaleCmd = &cobra.Command{
 			}
 
 			oldReplicas := scale.Spec.Replicas
-			scale.Spec.Replicas = int32(math.Ceil(float64(oldReplicas) * scaleFactor))
+			scale.Spec.Replicas = int32(math.Ceil(float64(max(1, oldReplicas)) * scaleFactor))
 
 			kube.Std("Scale from %d to %d", oldReplicas, scale.Spec.Replicas)
 
