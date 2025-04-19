@@ -60,10 +60,6 @@ var scaleCmd = &cobra.Command{
 			cancel()
 		}()
 
-		if scaleFactor == 1 {
-			return nil
-		}
-
 		if scaleFactor == 0 && !scaleForce {
 			return errors.New("Use `--force` to confirm downscaling to zero pods")
 		}
@@ -76,6 +72,11 @@ var scaleCmd = &cobra.Command{
 
 			oldReplicas := scale.Spec.Replicas
 			scale.Spec.Replicas = int32(math.Ceil(float64(max(1, oldReplicas)) * scaleFactor))
+
+			if oldReplicas == scale.Spec.Replicas {
+				kube.Std("No replica change from %d", scale.Spec.Replicas)
+				return nil
+			}
 
 			kube.Std("Scale from %d to %d", oldReplicas, scale.Spec.Replicas)
 
