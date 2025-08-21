@@ -2,8 +2,8 @@ package client
 
 import (
 	"context"
+	"sync"
 
-	"github.com/ViBiOh/kmux/pkg/concurrent"
 	"github.com/ViBiOh/kmux/pkg/output"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -32,7 +32,7 @@ type Action func(context.Context, Kube) error
 type Array []Kube
 
 func (a Array) Execute(ctx context.Context, action Action) {
-	parallel := concurrent.NewSimple()
+	var parallel sync.WaitGroup
 
 	for _, client := range a {
 		client := client

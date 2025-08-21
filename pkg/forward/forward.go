@@ -11,7 +11,6 @@ import (
 	"sync"
 
 	"github.com/ViBiOh/kmux/pkg/client"
-	"github.com/ViBiOh/kmux/pkg/concurrent"
 	"github.com/ViBiOh/kmux/pkg/output"
 	"github.com/ViBiOh/kmux/pkg/resource"
 	"github.com/ViBiOh/kmux/pkg/tcpool"
@@ -72,7 +71,7 @@ func (f Forwarder) Forward(ctx context.Context, kube client.Kube) error {
 	}
 
 	var activeForwarding sync.Map
-	forwarding := concurrent.NewSimple()
+	var forwarding sync.WaitGroup
 
 	for event := range podWatcher.ResultChan() {
 		pod, ok := event.Object.(*v1.Pod)
@@ -101,7 +100,7 @@ func (f Forwarder) Forward(ctx context.Context, kube client.Kube) error {
 			continue
 		}
 
-		f.handleForwardPod(kube, &activeForwarding, forwarding, *pod, remotePort, podLimiter)
+		f.handleForwardPod(kube, &activeForwarding, &forwarding, *pod, remotePort, podLimiter)
 	}
 
 	activeForwarding.Range(func(key, value any) bool {
@@ -186,7 +185,7 @@ func getForwardContainer(pod *v1.Pod, remotePort int32) (string, bool) {
 	return "", false
 }
 
-func (f Forwarder) handleForwardPod(kube client.Kube, activeForwarding *sync.Map, forwarding *concurrent.Simple, pod v1.Pod, remotePort int32, podLimiter chan struct{}) {
+func (f Forwarder) handleForwardPod(kube client.Kube, activeForwarding *sync.Map, forwarding *sync.WaitGroup, pod v1.Pod, remotePort int32, podLimiter chan struct{}) {
 	stopChan := make(chan struct{})
 	activeForwarding.Store(pod.UID, stopChan)
 

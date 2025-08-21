@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/ViBiOh/kmux/pkg/client"
-	"github.com/ViBiOh/kmux/pkg/concurrent"
 	"github.com/ViBiOh/kmux/pkg/output"
 	"github.com/ViBiOh/kmux/pkg/resource"
 	"github.com/fatih/color"
@@ -100,8 +99,7 @@ func (l Logger) Log(ctx context.Context, kube client.Kube) error {
 	defer podWatcher.Stop()
 
 	var activeStreams sync.Map
-
-	streaming := concurrent.NewSimple()
+	var streaming sync.WaitGroup
 
 	for event := range podWatcher.ResultChan() {
 		pod, ok := event.Object.(*v1.Pod)
@@ -119,7 +117,7 @@ func (l Logger) Log(ctx context.Context, kube client.Kube) error {
 					activeStreams.Delete(pod.UID)
 				}
 			} else if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
-				l.handlePod(ctx, kube, &activeStreams, streaming, *pod)
+				l.handlePod(ctx, kube, &activeStreams, &streaming, *pod)
 			}
 
 			continue
@@ -129,7 +127,7 @@ func (l Logger) Log(ctx context.Context, kube client.Kube) error {
 			continue
 		}
 
-		l.handlePod(ctx, kube, &activeStreams, streaming, *pod)
+		l.handlePod(ctx, kube, &activeStreams, &streaming, *pod)
 	}
 
 	streaming.Wait()
@@ -137,7 +135,7 @@ func (l Logger) Log(ctx context.Context, kube client.Kube) error {
 	return nil
 }
 
-func (l Logger) handlePod(ctx context.Context, kube client.Kube, activeStreams *sync.Map, streaming *concurrent.Simple, pod v1.Pod) {
+func (l Logger) handlePod(ctx context.Context, kube client.Kube, activeStreams *sync.Map, streaming *sync.WaitGroup, pod v1.Pod) {
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		if !resource.IsContainedSelected(container, l.containerRegexp) {
 			continue
