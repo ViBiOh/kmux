@@ -31,11 +31,11 @@ var rootCmd = &cobra.Command{
 	Short: "Multiplexing kubectl common tasks across clusters",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
 		if cmd.Name() == "version" {
-			return
+			return err
 		}
 
 		if parent := cmd.Parent(); parent != nil && parent.Name() == "completion" {
-			return
+			return err
 		}
 
 		clients, err = getKubernetesClient(viper.GetStringSlice("context"))

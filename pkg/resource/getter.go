@@ -131,14 +131,14 @@ func GetPodsSelector(ctx context.Context, kube client.Kube, kind, name string) (
 			namespace = name
 		}
 
-		return
+		return namespace, options, postListFilter, err
 
 	case "po", "pod", "pods",
 		"no", "node", "nodes":
 		namespace = kube.Namespace
 		options.FieldSelector, err = podFieldSelectorGetter(kind, name)
 
-		return
+		return namespace, options, postListFilter, err
 
 	case "svc", "service", "services":
 		var service *v1.Service
@@ -146,21 +146,19 @@ func GetPodsSelector(ctx context.Context, kube client.Kube, kind, name string) (
 		if err != nil {
 			err = fmt.Errorf("get services: %w", err)
 
-			return
+			return namespace, options, postListFilter, err
 		}
 
 		namespace = kube.Namespace
 		options.LabelSelector = labelSelectorFromMaps(service.Spec.Selector)
 
-		return
+		return namespace, options, postListFilter, err
 
 	case "cj", "cronjob", "cronjobs":
 		var cronjob *batchv1.CronJob
 		cronjob, err = kube.BatchV1().CronJobs(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
-			err = fmt.Errorf("get cronjob: %w", err)
-
-			return
+			return namespace, options, postListFilter, fmt.Errorf("get cronjob: %w", err)
 		}
 
 		namespace = kube.Namespace
@@ -188,19 +186,19 @@ func GetPodsSelector(ctx context.Context, kube client.Kube, kind, name string) (
 			return false
 		}
 
-		return
+		return namespace, options, postListFilter, err
 
 	default:
 		var labelSelector *metav1.LabelSelector
 		labelSelector, err = podLabelSelectorGetter(ctx, kube, kind, name)
 		if err != nil {
-			return
+			return namespace, options, postListFilter, err
 		}
 
 		namespace = kube.Namespace
 		options.LabelSelector = labelSelectorFromMaps(labelSelector.MatchLabels)
 
-		return
+		return namespace, options, postListFilter, err
 	}
 }
 
