@@ -2,6 +2,7 @@ package forward
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -50,11 +51,16 @@ func (f Forwarder) Forward(ctx context.Context, kube client.Kube) error {
 	remotePort := f.remotePort
 
 	if resource.IsService(f.kind) {
+		var hasSelector bool
 		var err error
 
-		remotePort, err = getTargetPort(ctx, kube, f.name, remotePort)
+		remotePort, hasSelector, err = getSelectorAndTargetPort(ctx, kube, f.name, remotePort)
 		if err != nil {
-			kube.Err("get target port: %s", err)
+			return fmt.Errorf("get selector and target port: %w", err)
+		}
+
+		if !hasSelector {
+			return errors.New("service has no selector")
 		}
 	}
 
@@ -113,23 +119,25 @@ func (f Forwarder) Forward(ctx context.Context, kube client.Kube) error {
 	return nil
 }
 
-func getTargetPort(ctx context.Context, kube client.Kube, name, port string) (string, error) {
+func getSelectorAndTargetPort(ctx context.Context, kube client.Kube, name, port string) (string, bool, error) {
 	service, err := kube.CoreV1().Services(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
-		return "", fmt.Errorf("get service: %w", err)
+		return "", false, fmt.Errorf("get service: %w", err)
 	}
+
+	hasSelector := len(service.Spec.Selector) != 0
 
 	for _, servicePort := range service.Spec.Ports {
 		if servicePort.Name == port || strconv.Itoa(int(servicePort.Port)) == port {
 			if len(servicePort.TargetPort.StrVal) != 0 {
-				return servicePort.TargetPort.StrVal, nil
+				return servicePort.TargetPort.StrVal, hasSelector, nil
 			}
 
-			return strconv.Itoa(int(servicePort.TargetPort.IntVal)), nil
+			return strconv.Itoa(int(servicePort.TargetPort.IntVal)), hasSelector, nil
 		}
 	}
 
-	return port, nil
+	return port, hasSelector, nil
 }
 
 func getForwardPort(pod *v1.Pod, remotePort string) int32 {

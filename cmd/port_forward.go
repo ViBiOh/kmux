@@ -87,6 +87,7 @@ var portForwardCmd = &cobra.Command{
 		forwarder := forward.NewForwarder(kind, name, remotePort, pool, limiter)
 
 		clients.Execute(ctx, forwarder.Forward)
+		cancel()
 
 		if pool != nil {
 			<-pool.Done()
