@@ -18,9 +18,9 @@ func TestAdd(t *testing.T) {
 	}{
 		"simple": {
 			args{
-				backend: "localhost:4000",
+				backend: "127.0.0.1:4000",
 			},
-			[]string{"localhost:4000"},
+			[]string{"127.0.0.1:4000"},
 		},
 	}
 
@@ -50,16 +50,16 @@ func TestRemove(t *testing.T) {
 		"empty": {
 			New(),
 			args{
-				backend: "localhost:4000",
+				backend: "127.0.0.1:4000",
 			},
 			nil,
 		},
 		"middle element": {
-			New().Add("localhost:4000").Add("localhost:5000").Add("localhost:6000"),
+			New().Add("127.0.0.1:4000").Add("127.0.0.1:5000").Add("127.0.0.1:6000"),
 			args{
-				backend: "localhost:5000",
+				backend: "127.0.0.1:5000",
 			},
-			[]string{"localhost:4000", "localhost:6000"},
+			[]string{"127.0.0.1:4000", "127.0.0.1:6000"},
 		},
 	}
 
@@ -77,7 +77,7 @@ func TestRemove(t *testing.T) {
 func TestNext(t *testing.T) {
 	t.Parallel()
 
-	loop := New().Add("localhost:4000").Add("localhost:5000")
+	loop := New().Add("127.0.0.1:4000").Add("127.0.0.1:5000")
 	loop.next()
 
 	cases := map[string]struct {
@@ -89,16 +89,16 @@ func TestNext(t *testing.T) {
 			"",
 		},
 		"one item": {
-			New().Add("localhost:4000"),
-			"localhost:4000",
+			New().Add("127.0.0.1:4000"),
+			"127.0.0.1:4000",
 		},
 		"many item": {
-			New().Add("localhost:4000").Add("localhost:5000"),
-			"localhost:5000",
+			New().Add("127.0.0.1:4000").Add("127.0.0.1:5000"),
+			"127.0.0.1:5000",
 		},
 		"loop": {
 			loop,
-			"localhost:4000",
+			"127.0.0.1:4000",
 		},
 	}
 
