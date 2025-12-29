@@ -22,7 +22,7 @@ func ListerFor(kind string) (Lister, error) {
 
 			output := make([]string, len(items.Items))
 			for i, item := range items.Items {
-				output[i] = item.ObjectMeta.GetName()
+				output[i] = item.GetName()
 			}
 
 			return output, nil
@@ -37,7 +37,7 @@ func ListerFor(kind string) (Lister, error) {
 
 			output := make([]string, len(items.Items))
 			for i, item := range items.Items {
-				output[i] = item.ObjectMeta.GetName()
+				output[i] = item.GetName()
 			}
 
 			return output, nil
@@ -52,7 +52,7 @@ func ListerFor(kind string) (Lister, error) {
 
 			output := make([]string, len(items.Items))
 			for i, item := range items.Items {
-				output[i] = item.ObjectMeta.GetName()
+				output[i] = item.GetName()
 			}
 
 			return output, nil
@@ -67,7 +67,7 @@ func ListerFor(kind string) (Lister, error) {
 
 			output := make([]string, len(items.Items))
 			for i, item := range items.Items {
-				output[i] = item.ObjectMeta.GetName()
+				output[i] = item.GetName()
 			}
 
 			return output, nil
@@ -82,7 +82,7 @@ func ListerFor(kind string) (Lister, error) {
 
 			output := make([]string, len(items.Items))
 			for i, item := range items.Items {
-				output[i] = item.ObjectMeta.GetName()
+				output[i] = item.GetName()
 			}
 
 			return output, nil
@@ -97,7 +97,7 @@ func ListerFor(kind string) (Lister, error) {
 
 			output := make([]string, len(items.Items))
 			for i, item := range items.Items {
-				output[i] = item.ObjectMeta.GetName()
+				output[i] = item.GetName()
 			}
 
 			return output, nil
@@ -112,7 +112,7 @@ func ListerFor(kind string) (Lister, error) {
 
 			output := make([]string, len(items.Items))
 			for i, item := range items.Items {
-				output[i] = item.ObjectMeta.GetName()
+				output[i] = item.GetName()
 			}
 
 			return output, nil
@@ -127,7 +127,7 @@ func ListerFor(kind string) (Lister, error) {
 
 			output := make([]string, len(items.Items))
 			for i, item := range items.Items {
-				output[i] = item.ObjectMeta.GetName()
+				output[i] = item.GetName()
 			}
 
 			return output, nil
@@ -142,7 +142,7 @@ func ListerFor(kind string) (Lister, error) {
 
 			output := make([]string, len(items.Items))
 			for i, item := range items.Items {
-				output[i] = item.ObjectMeta.GetName()
+				output[i] = item.GetName()
 			}
 
 			return output, nil

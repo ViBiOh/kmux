@@ -110,7 +110,7 @@ func (eg EnvGetter) Get(ctx context.Context, kube client.Kube) error {
 		outputter := kube.Outputter
 
 		if len(containers) != 1 {
-			outputter = kube.Outputter.Child(false, output.Green.Sprintf("[%s]", container.Name))
+			outputter = kube.Child(false, output.Green.Sprintf("[%s]", container.Name))
 		}
 
 		outputter.Std("%s", containerOutput.String())
@@ -227,18 +227,18 @@ func gatherEnvDependencies(container v1.Container) (map[string]map[string]string
 	for _, env := range container.Env {
 		if env.ValueFrom != nil {
 			if env.ValueFrom.ConfigMapKeyRef != nil {
-				configMaps[env.ValueFrom.ConfigMapKeyRef.LocalObjectReference.Name] = nil
+				configMaps[env.ValueFrom.ConfigMapKeyRef.Name] = nil
 			} else if env.ValueFrom.SecretKeyRef != nil {
-				secrets[env.ValueFrom.SecretKeyRef.LocalObjectReference.Name] = nil
+				secrets[env.ValueFrom.SecretKeyRef.Name] = nil
 			}
 		}
 	}
 
 	for _, envFrom := range container.EnvFrom {
 		if envFrom.ConfigMapRef != nil {
-			configMaps[envFrom.ConfigMapRef.LocalObjectReference.Name] = nil
+			configMaps[envFrom.ConfigMapRef.Name] = nil
 		} else if envFrom.SecretRef != nil {
-			secrets[envFrom.SecretRef.LocalObjectReference.Name] = nil
+			secrets[envFrom.SecretRef.Name] = nil
 		}
 	}
 

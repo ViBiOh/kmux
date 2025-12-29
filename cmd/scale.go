@@ -61,7 +61,7 @@ var scaleCmd = &cobra.Command{
 		}()
 
 		if scaleFactor == 0 && !scaleForce {
-			return errors.New("Use `--force` to confirm downscaling to zero pods")
+			return errors.New("use `--force` to confirm downscaling to zero pods")
 		}
 
 		clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {

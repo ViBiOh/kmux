@@ -94,7 +94,7 @@ var restartCmd = &cobra.Command{
 				}
 
 				job.Spec.Selector = nil
-				job.Spec.Template.ObjectMeta.Labels = nil
+				job.Spec.Template.Labels = nil
 
 				if err = kube.BatchV1().Jobs(kube.Namespace).Delete(ctx, name, v1.DeleteOptions{}); err != nil {
 					return err

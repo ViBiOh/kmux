@@ -24,7 +24,7 @@ type ReplicableDeployment struct {
 }
 
 func (rd ReplicableDeployment) GetReplicas() *int32 {
-	return rd.DeploymentSpec.Replicas
+	return rd.Replicas
 }
 
 type ReplicableReplicaSet struct {
@@ -32,7 +32,7 @@ type ReplicableReplicaSet struct {
 }
 
 func (rd ReplicableReplicaSet) GetReplicas() *int32 {
-	return rd.ReplicaSetSpec.Replicas
+	return rd.Replicas
 }
 
 type ReplicableStatefulSet struct {
@@ -40,7 +40,7 @@ type ReplicableStatefulSet struct {
 }
 
 func (rd ReplicableStatefulSet) GetReplicas() *int32 {
-	return rd.StatefulSetSpec.Replicas
+	return rd.Replicas
 }
 
 func GetScale(ctx context.Context, kube client.Kube, kind, name string) (*autoscalingv1.Scale, error) {
@@ -164,7 +164,7 @@ func GetPodsSelector(ctx context.Context, kube client.Kube, kind, name string) (
 		namespace = kube.Namespace
 		options.LabelSelector = "job-name"
 		postListFilter = func(ctx context.Context, kube client.Kube, pod v1.Pod) bool {
-			for _, podReference := range pod.ObjectMeta.OwnerReferences {
+			for _, podReference := range pod.OwnerReferences {
 				if podReference.Kind != "Job" {
 					continue
 				}
@@ -176,7 +176,7 @@ func GetPodsSelector(ctx context.Context, kube client.Kube, kind, name string) (
 					continue
 				}
 
-				for _, jobReference := range job.ObjectMeta.OwnerReferences {
+				for _, jobReference := range job.OwnerReferences {
 					if jobReference.UID == cronjob.UID {
 						return true
 					}
