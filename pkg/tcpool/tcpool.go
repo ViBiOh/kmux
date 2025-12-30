@@ -70,8 +70,12 @@ func (bp *Pool) next() string {
 func (bp *Pool) handle(us net.Conn, server string) {
 	ds, err := net.Dial("tcp", server)
 	if err != nil {
-		us.Close()
 		output.Err("", "dial %s: %s", server, err)
+
+		if closeErr := us.Close(); closeErr != nil {
+			output.Err("", "close error: %s", closeErr)
+		}
+
 		return
 	}
 
@@ -113,7 +117,11 @@ func (bp *Pool) Start(ctx context.Context, localPort uint64) {
 }
 
 func stream(writer io.WriteCloser, reader io.Reader) {
-	defer writer.Close()
+	defer func() {
+		if closeErr := writer.Close(); closeErr != nil {
+			output.Err("", "close error: %s", closeErr)
+		}
+	}()
 
 	if _, err := io.Copy(writer, reader); err != nil {
 		if !strings.HasSuffix(err.Error(), "use of closed network connection") {
