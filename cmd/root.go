@@ -127,7 +127,7 @@ func init() {
 		output.Fatal("bind `kubeconfig` flag: %s", err)
 	}
 
-	flags.StringSlice("context", nil, "Kubernetes context, multiple for mutiplexing commands")
+	flags.StringSlice("context", nil, "Kubernetes context, multiple for multiplexing commands")
 	if err := viper.BindPFlag("context", flags.Lookup("context")); err != nil {
 		output.Fatal("bind `context` flag: %s", err)
 	}

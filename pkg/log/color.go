@@ -3,6 +3,7 @@ package log
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -100,6 +101,9 @@ func moveDecoderToKey(decoder *json.Decoder, keys ...string) error {
 	for {
 		token, err = decoder.Token()
 		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
 			return fmt.Errorf("decode token: %w", err)
 		}
 

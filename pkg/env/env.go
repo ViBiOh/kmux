@@ -352,21 +352,39 @@ func getEnvFieldRef(pod v1.Pod, field v1.ObjectFieldSelector) string {
 func getEnvResourceRef(container v1.Container, node v1.Node, resource v1.ResourceFieldSelector) string {
 	switch resource.Resource {
 	case "limits.cpu":
+		if container.Resources.Limits == nil || node.Status.Capacity == nil {
+			return ""
+		}
 		return getResourceLimit(*container.Resources.Limits.Cpu(), *node.Status.Capacity.Cpu(), resource.Divisor)
 
 	case "limits.memory":
+		if container.Resources.Limits == nil || node.Status.Capacity == nil {
+			return ""
+		}
 		return getResourceLimit(*container.Resources.Limits.Memory(), *node.Status.Capacity.Memory(), resource.Divisor)
 
 	case "limits.ephemeral-storage":
+		if container.Resources.Limits == nil || node.Status.Capacity == nil {
+			return ""
+		}
 		return getResourceLimit(*container.Resources.Limits.StorageEphemeral(), *node.Status.Capacity.StorageEphemeral(), resource.Divisor)
 
 	case "requests.cpu":
+		if container.Resources.Requests == nil {
+			return ""
+		}
 		return getResourceRequest(*container.Resources.Requests.Cpu(), resource.Divisor)
 
 	case "requests.memory":
+		if container.Resources.Requests == nil {
+			return ""
+		}
 		return getResourceRequest(*container.Resources.Requests.Memory(), resource.Divisor)
 
 	case "requests.ephemeral-storage":
+		if container.Resources.Requests == nil {
+			return ""
+		}
 		return getResourceRequest(*container.Resources.Requests.StorageEphemeral(), resource.Divisor)
 
 	default:

@@ -10,7 +10,7 @@ A clear and concise description of what the bug is.
 **To Reproduce**
 Steps to reproduce the behavior:
 
-1. Command linde '...'
+1. Command line '...'
 2. Scroll down to '....'
 3. See error
 

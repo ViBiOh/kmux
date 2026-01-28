@@ -54,14 +54,14 @@ kmux --context central1 --context europe1 --context asia1 image
 ```
 Global Flags:
   -A, --all-namespaces      Find resources in all namespaces
-      --context strings     Kubernetes context, multiple for mutiplexing commands
+      --context strings     Kubernetes context, multiple for multiplexing commands
       --kubeconfig string   Kubernetes configuration file (default "${HOME}/.kube/config")
   -n, --namespace string    Override kubernetes namespace in context
 ```
 
 ### `log`
 
-`log` command open a pod's watcher on a resource (Deployment, Service, CronJob, etc) by using label or fiels selector and stream every container's logs of every pod it finds. New pods matching the selector are automatically streamed. Logs are stream by default (the `--follow` option in regular `kubectl`).
+`log` command open a pod's watcher on a resource (Deployment, Service, CronJob, etc) by using label or field selector and stream every container's logs of every pod it finds. New pods matching the selector are automatically streamed. Logs are stream by default (the `--follow` option in regular `kubectl`).
 
 Each log line has a prefix of the pod's name and the container name, and also the context's name if there are multiple contexts. These kind of metadatas are written to the `stderr`, this way, if you have logs in JSON, you can pipe `kmux` output into `jq` for example for extracting wanted data from logs (instead of using `--grep` or native `grep`). You can also remove completely the prefixes by setting `--raw-output` option.
 
@@ -93,7 +93,7 @@ Flags:
   -v, --invert-match              Invert regexp filter matching
       --levelKeys strings         Keys for level in JSON (default [level,severity])
       --no-follow                 Don't follow logs
-  -r, --raw-output                Raw ouput, don't print context or pod prefixes
+  -r, --raw-output                Raw output, don't print context or pod prefixes
   -l, --selector stringToString   Labels to filter pods (default [])
   -s, --since duration            Display logs since given duration (default 1h0m0s)
       --statusCodeKeys strings    Keys for HTTP Status code in JSON (default [status,statusCode,response_code,http_status,OriginStatus])
@@ -183,7 +183,7 @@ Flags:
 
 ### `scale`
 
-`scale` changes the `replicas` field on a replicable ressource (deployment, replicaset, statefulset). It works by using a `scale factor`, you don't need to know the current replicas count.
+`scale` changes the `replicas` field on a replicable resource (deployment, replicaset, statefulset). It works by using a `scale factor`, you don't need to know the current replicas count.
 
 ```bash
 Scale a resource by a given factor

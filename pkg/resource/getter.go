@@ -3,7 +3,6 @@ package resource
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/ViBiOh/kmux/pkg/client"
 	appsv1 "k8s.io/api/apps/v1"
@@ -11,6 +10,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 type PodFilter func(context.Context, client.Kube, v1.Pod) bool
@@ -254,18 +254,8 @@ func podFieldSelectorGetter(kind, name string) (string, error) {
 	}
 }
 
-func labelSelectorFromMaps(labels map[string]string) string {
-	var labelSelector strings.Builder
-
-	for key, value := range labels {
-		if labelSelector.Len() > 0 {
-			labelSelector.WriteString(",")
-		}
-
-		labelSelector.WriteString(fmt.Sprintf("%s=%s", key, value))
-	}
-
-	return labelSelector.String()
+func labelSelectorFromMaps(labelMap map[string]string) string {
+	return labels.SelectorFromSet(labels.Set(labelMap)).String()
 }
 
 func unhandledError(kind string) error {
