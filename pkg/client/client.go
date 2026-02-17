@@ -35,8 +35,6 @@ func (a Array) Execute(ctx context.Context, action Action) {
 	var parallel sync.WaitGroup
 
 	for _, client := range a {
-		client := client
-
 		parallel.Go(func() {
 			if err := action(ctx, client); err != nil {
 				client.Err("%s", err)

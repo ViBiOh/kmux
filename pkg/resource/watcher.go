@@ -110,7 +110,6 @@ func watchPodsDry(ctx context.Context, kube client.Kube, namespace string, optio
 		defer close(podsChan)
 
 		for _, pod := range items {
-			pod := pod
 			podsChan <- watch.Event{
 				Type:   watch.Added,
 				Object: &pod,

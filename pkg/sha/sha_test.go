@@ -28,9 +28,6 @@ func TestJSON(t *testing.T) {
 	}
 
 	for intention, testCase := range cases {
-		intention := intention
-		testCase := testCase
-
 		t.Run(intention, func(t *testing.T) {
 			t.Parallel()
 

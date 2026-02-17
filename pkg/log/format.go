@@ -2,6 +2,7 @@ package log
 
 import (
 	"regexp"
+	"strings"
 
 	"github.com/ViBiOh/kmux/pkg/output"
 	"github.com/fatih/color"
@@ -18,7 +19,7 @@ func Format(text string, outputter *color.Color) string {
 }
 
 func FormatGrep(text string, logFilter *regexp.Regexp, outputter *color.Color) string {
-	var greppedText string
+	var greppedText strings.Builder
 	var currentIndex int
 
 	highlight := output.Red
@@ -28,17 +29,17 @@ func FormatGrep(text string, logFilter *regexp.Regexp, outputter *color.Color) s
 
 	for _, index := range logFilter.FindAllStringIndex(text, -1) {
 		if index[0] != currentIndex {
-			greppedText += Format(text[currentIndex:index[0]], outputter)
+			greppedText.WriteString(Format(text[currentIndex:index[0]], outputter))
 		}
 
-		greppedText += highlight.Sprint(text[index[0]:index[1]])
+		greppedText.WriteString(highlight.Sprint(text[index[0]:index[1]]))
 
 		currentIndex = index[1]
 	}
 
 	if currentIndex != len(text) {
-		greppedText += Format(text[currentIndex:], outputter)
+		greppedText.WriteString(Format(text[currentIndex:], outputter))
 	}
 
-	return greppedText
+	return greppedText.String()
 }
