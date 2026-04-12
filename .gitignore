@@ -10,5 +10,4 @@ coverage.*
 profile.out
 
 # Files
-ca-certificates.crt
-zoneinfo.zip
+cacert.pem
