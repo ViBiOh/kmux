@@ -110,7 +110,8 @@ func initWatchTable() *table.Table {
 
 	if outputFormat == "wide" {
 		defaultWidths = append(defaultWidths, 12, 12, 14, 15)
-		content = append(content,
+		content = append(
+			content,
 			table.NewCell("IP"),
 			table.NewCell("NODE"),
 			table.NewCell("NOMINATED NODE"),
@@ -234,7 +235,8 @@ func outputWatch(watchTable *table.Table, contextName string, pod v1.Pod) {
 		readyColor = output.Green
 	}
 
-	content = append(content,
+	content = append(
+		content,
 		table.NewCell(pod.Name),
 		table.NewCellColor(fmt.Sprintf("%d/%d", ready, total), readyColor),
 		getPhaseCell(phase),
@@ -244,7 +246,8 @@ func outputWatch(watchTable *table.Table, contextName string, pod v1.Pod) {
 
 	if outputFormat == "wide" {
 		ip, node, nominatedNode, readinessGates := getPodWide(pod)
-		content = append(content,
+		content = append(
+			content,
 			table.NewCell(ip),
 			table.NewCell(node),
 			table.NewCell(nominatedNode),
