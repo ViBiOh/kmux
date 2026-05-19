@@ -2,6 +2,7 @@ package log
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,6 +24,8 @@ var colorRanks = map[*color.Color]uint{
 	output.White:  2,
 	output.Green:  3,
 }
+
+var errKeyNotFound = errors.New("key not found")
 
 func ColorFromName(name string) *color.Color {
 	found, ok := colorNames[name]
@@ -92,36 +95,34 @@ func ColorOfJSON(content string, keys ...string) *color.Color {
 }
 
 func moveDecoderToKey(decoder *json.Decoder, keys ...string) error {
-	var (
-		token  json.Token
-		nested uint64
-		err    error
-	)
+	var nested uint64
 
 	for {
-		token, err = decoder.Token()
+		token, err := decoder.Token()
 		if err != nil {
-			if err == io.EOF {
-				return nil
+			if errors.Is(err, io.EOF) {
+				return errKeyNotFound
 			}
+
 			return fmt.Errorf("decode token: %w", err)
 		}
 
-		tokenStr := fmt.Sprintf("%s", token)
-
-		if nested == 1 {
-			for _, key := range keys {
-				if strings.EqualFold(tokenStr, key) {
-					return nil
+		switch t := token.(type) {
+		case json.Delim:
+			switch t {
+			case '{':
+				nested++
+			case '}':
+				nested--
+			}
+		case string:
+			if nested == 1 {
+				for _, key := range keys {
+					if strings.EqualFold(t, key) {
+						return nil
+					}
 				}
 			}
-		}
-
-		switch tokenStr {
-		case "{":
-			nested++
-		case "}":
-			nested--
 		}
 	}
 }

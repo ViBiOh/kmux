@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/ViBiOh/kmux/pkg/client"
 	"github.com/ViBiOh/kmux/pkg/output"
@@ -28,7 +29,7 @@ type envValue struct {
 }
 
 func (ev envValue) String() string {
-	output := output.Yellow.Sprintf("# %s\n", ev.source)
+	header := output.Yellow.Sprintf("# %s\n", ev.source)
 
 	entries := make([]string, 0, len(ev.data))
 
@@ -38,7 +39,7 @@ func (ev envValue) String() string {
 
 	sort.Strings(entries)
 
-	return output + strings.Join(entries, "")
+	return header + strings.Join(entries, "")
 }
 
 type EnvGetter struct {
@@ -193,29 +194,43 @@ func getEnv(ctx context.Context, kube client.Kube, container v1.Container, pod v
 func getEnvDependencies(ctx context.Context, kube client.Kube, container v1.Container) (map[string]map[string]string, map[string]map[string]string) {
 	configMaps, secrets := gatherEnvDependencies(container)
 
-	for name := range configMaps {
-		configMap, err := kube.CoreV1().ConfigMaps(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
-			kube.Err("getting configmap `%s`: %s", name, err)
-			continue
-		}
+	var wg sync.WaitGroup
+	var mu sync.Mutex
 
-		configMaps[name] = configMap.Data
+	for name := range configMaps {
+		wg.Go(func() {
+			configMap, err := kube.CoreV1().ConfigMaps(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
+			if err != nil {
+				kube.Err("getting configmap `%s`: %s", name, err)
+				return
+			}
+
+			mu.Lock()
+			configMaps[name] = configMap.Data
+			mu.Unlock()
+		})
 	}
 
 	for name := range secrets {
-		secret, err := kube.CoreV1().Secrets(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
-			kube.Err("getting secret `%s`: %s", name, err)
-			continue
-		}
+		wg.Go(func() {
+			secret, err := kube.CoreV1().Secrets(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
+			if err != nil {
+				kube.Err("getting secret `%s`: %s", name, err)
+				return
+			}
 
-		secrets[name] = make(map[string]string)
+			data := make(map[string]string, len(secret.Data))
+			for key, value := range secret.Data {
+				data[key] = string(value)
+			}
 
-		for key, value := range secret.Data {
-			secrets[name][key] = string(value)
-		}
+			mu.Lock()
+			secrets[name] = data
+			mu.Unlock()
+		})
 	}
+
+	wg.Wait()
 
 	return configMaps, secrets
 }
@@ -303,6 +318,8 @@ func getValueFromRef(storage map[string]map[string]string, kind, name, key strin
 		if optional != nil && !*optional {
 			return fmt.Sprintf("<%s `%s` not optional and not found>", kind, name)
 		}
+
+		return ""
 	}
 
 	return values[key]

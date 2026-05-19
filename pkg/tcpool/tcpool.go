@@ -19,7 +19,10 @@ type Pool struct {
 }
 
 func New() *Pool {
-	return &Pool{}
+	return &Pool{
+		done:    make(chan struct{}),
+		current: ^uint64(0),
+	}
 }
 
 func (bp *Pool) Done() <-chan struct{} {
@@ -84,7 +87,6 @@ func (bp *Pool) handle(us net.Conn, server string) {
 }
 
 func (bp *Pool) Start(ctx context.Context, localPort uint64) {
-	bp.done = make(chan struct{})
 	defer close(bp.done)
 
 	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", localPort))

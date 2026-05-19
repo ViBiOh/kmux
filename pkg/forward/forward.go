@@ -263,7 +263,7 @@ func GetFreePort() (int32, error) {
 	}
 
 	if closeErr := listener.Close(); closeErr != nil {
-		return 0, fmt.Errorf("close listener: %w", err)
+		return 0, fmt.Errorf("close listener: %w", closeErr)
 	}
 
 	return int32(listener.Addr().(*net.TCPAddr).Port), nil

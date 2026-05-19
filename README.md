@@ -48,7 +48,7 @@ Because the goal of this tool is to be used on multiple clusters at once, we rel
 For running on multiple clusters at once, set the `--context` flag multiple times.
 
 ```bash
-kmux --context central1 --context europe1 --context asia1 image
+kmux --context central1 --context europe1 --context asia1 watch
 ```
 
 ```
@@ -61,7 +61,7 @@ Global Flags:
 
 ### `log`
 
-`log` command open a pod's watcher on a resource (Deployment, Service, CronJob, etc) by using label or field selector and stream every container's logs of every pod it finds. New pods matching the selector are automatically streamed. Logs are stream by default (the `--follow` option in regular `kubectl`).
+`log` command open a pod's watcher on a resource (Deployment, Service, CronJob, etc) by using label or field selector and stream every container's logs of every pod it finds. New pods matching the selector are automatically streamed. Logs are streamed by default (the `--follow` option in regular `kubectl`).
 
 Each log line has a prefix of the pod's name and the container name, and also the context's name if there are multiple contexts. These kind of metadatas are written to the `stderr`, this way, if you have logs in JSON, you can pipe `kmux` output into `jq` for example for extracting wanted data from logs (instead of using `--grep` or native `grep`). You can also remove completely the prefixes by setting `--raw-output` option.
 

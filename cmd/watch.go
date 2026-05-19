@@ -12,7 +12,6 @@ import (
 	"github.com/ViBiOh/kmux/pkg/client"
 	"github.com/ViBiOh/kmux/pkg/output"
 	"github.com/ViBiOh/kmux/pkg/resource"
-	"github.com/ViBiOh/kmux/pkg/sha"
 	"github.com/ViBiOh/kmux/pkg/table"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -74,7 +73,7 @@ var watchCmd = &cobra.Command{
 					continue
 				}
 
-				if initialsPodsHash[sha.JSON(*pod)] {
+				if initialsPodsHash[string(pod.UID)+"/"+pod.ResourceVersion] {
 					continue
 				}
 
@@ -104,7 +103,14 @@ func initWatchTable() *table.Table {
 	}
 
 	if len(clients) > 0 && len(clients[0].Name) != 0 {
-		defaultWidths = append([]uint64{uint64(len(clients[0].Name))}, defaultWidths...)
+		var maxContextWidth uint64
+		for _, c := range clients {
+			if w := uint64(len(c.Name)); w > maxContextWidth {
+				maxContextWidth = w
+			}
+		}
+
+		defaultWidths = append([]uint64{maxContextWidth}, defaultWidths...)
 		content = append([]table.Cell{table.NewCell("CONTEXT")}, content...)
 	}
 
@@ -184,7 +190,7 @@ func displayInitialPods(ctx context.Context, watchTable *table.Table) map[string
 	initialsPodsHash := make(map[string]bool)
 
 	for _, pod := range listPods {
-		initialsPodsHash[sha.JSON(pod.Pod)] = true
+		initialsPodsHash[string(pod.UID)+"/"+pod.ResourceVersion] = true
 		outputWatch(watchTable, pod.ContextName, pod.Pod)
 	}
 

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/ViBiOh/kmux/pkg/client"
@@ -47,7 +46,7 @@ var restartCmd = &cobra.Command{
 				return nil, cobra.ShellCompDirectiveError
 			}
 
-			clients, err = getKubernetesClient(strings.Split(viper.GetString("context"), ","))
+			clients, err = getKubernetesClient(viper.GetStringSlice("context"))
 			if err != nil {
 				return nil, cobra.ShellCompDirectiveError
 			}

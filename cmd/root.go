@@ -197,7 +197,7 @@ func completeNamespace(cmd *cobra.Command, _ []string, _ string) ([]string, cobr
 		return nil, cobra.ShellCompDirectiveError
 	}
 
-	clients, err = getKubernetesClient(strings.Split(viper.GetString("context"), ","))
+	clients, err = getKubernetesClient(viper.GetStringSlice("context"))
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveError
 	}

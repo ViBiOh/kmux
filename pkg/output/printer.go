@@ -14,7 +14,7 @@ type event struct {
 
 var (
 	done       = make(chan struct{})
-	outputChan = make(chan event, 8)
+	outputChan = make(chan event, 128)
 )
 
 func init() {

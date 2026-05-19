@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"strings"
 	"syscall"
 
 	"github.com/ViBiOh/kmux/pkg/env"
@@ -35,7 +34,7 @@ var envCmd = &cobra.Command{
 				return nil, cobra.ShellCompDirectiveError
 			}
 
-			clients, err = getKubernetesClient(strings.Split(viper.GetString("context"), ","))
+			clients, err = getKubernetesClient(viper.GetStringSlice("context"))
 			if err != nil {
 				return nil, cobra.ShellCompDirectiveError
 			}

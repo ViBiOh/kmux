@@ -59,7 +59,7 @@ var logCmd = &cobra.Command{
 				return nil, cobra.ShellCompDirectiveError
 			}
 
-			clients, err = getKubernetesClient(strings.Split(viper.GetString("context"), ","))
+			clients, err = getKubernetesClient(viper.GetStringSlice("context"))
 			if err != nil {
 				return nil, cobra.ShellCompDirectiveError
 			}
@@ -143,7 +143,7 @@ func initLog() {
 	flags.StringVarP(&container, "container", "c", "", "Filter container's name by regexp, default to all containers")
 
 	flags.BoolVarP(&dryRun, "dry-run", "d", false, "Dry-run, print only pods")
-	flags.BoolVarP(&rawOutput, "raw-output", "r", false, "Raw ouput, don't print context or pod prefixes")
+	flags.BoolVarP(&rawOutput, "raw-output", "r", false, "Raw output, don't print context or pod prefixes")
 
 	flags.BoolVarP(&noFollow, "no-follow", "", false, "Don't follow logs")
 
