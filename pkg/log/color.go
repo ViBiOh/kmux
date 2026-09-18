@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/ViBiOh/kmux/pkg/output"
@@ -15,6 +16,7 @@ import (
 var colorNames = map[string]*color.Color{
 	"red":    output.Red,
 	"yellow": output.Yellow,
+	"white":  output.White,
 	"green":  output.Green,
 }
 
@@ -26,6 +28,20 @@ var colorRanks = map[*color.Color]uint{
 }
 
 var errKeyNotFound = errors.New("key not found")
+
+func ColorNames() []string {
+	names := make([]string, 0, len(colorNames))
+
+	for name := range colorNames {
+		names = append(names, name)
+	}
+
+	slices.SortFunc(names, func(first, second string) int {
+		return int(colorRanks[colorNames[first]]) - int(colorRanks[colorNames[second]])
+	})
+
+	return names
+}
 
 func ColorFromName(name string) *color.Color {
 	found, ok := colorNames[name]
@@ -95,7 +111,9 @@ func ColorOfJSON(content string, keys ...string) *color.Color {
 }
 
 func moveDecoderToKey(decoder *json.Decoder, keys ...string) error {
-	var nested uint64
+	var depth uint64
+
+	expectKey := true
 
 	for {
 		token, err := decoder.Token()
@@ -107,21 +125,40 @@ func moveDecoderToKey(decoder *json.Decoder, keys ...string) error {
 			return fmt.Errorf("decode token: %w", err)
 		}
 
-		switch t := token.(type) {
-		case json.Delim:
-			switch t {
-			case '{':
-				nested++
-			case '}':
-				nested--
-			}
-		case string:
-			if nested == 1 {
-				for _, key := range keys {
-					if strings.EqualFold(t, key) {
-						return nil
-					}
+		if delim, ok := token.(json.Delim); ok {
+			switch delim {
+			case '{', '[':
+				depth++
+			case '}', ']':
+				if depth > 0 {
+					depth--
 				}
+			}
+
+			expectKey = depth == 1
+			continue
+		}
+
+		if depth != 1 {
+			continue
+		}
+
+		if !expectKey {
+			expectKey = true
+
+			continue
+		}
+
+		expectKey = false
+
+		name, ok := token.(string)
+		if !ok {
+			continue
+		}
+
+		for _, key := range keys {
+			if strings.EqualFold(name, key) {
+				return nil
 			}
 		}
 	}

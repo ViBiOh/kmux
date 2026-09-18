@@ -2,10 +2,11 @@ package resource
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/ViBiOh/kmux/pkg/client"
-	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -14,34 +15,6 @@ import (
 )
 
 type PodFilter func(context.Context, client.Kube, v1.Pod) bool
-
-type Replicable interface {
-	GetReplicas() *int32
-}
-
-type ReplicableDeployment struct {
-	appsv1.DeploymentSpec
-}
-
-func (rd ReplicableDeployment) GetReplicas() *int32 {
-	return rd.Replicas
-}
-
-type ReplicableReplicaSet struct {
-	appsv1.ReplicaSetSpec
-}
-
-func (rd ReplicableReplicaSet) GetReplicas() *int32 {
-	return rd.Replicas
-}
-
-type ReplicableStatefulSet struct {
-	appsv1.StatefulSetSpec
-}
-
-func (rd ReplicableStatefulSet) GetReplicas() *int32 {
-	return rd.Replicas
-}
 
 func GetScale(ctx context.Context, kube client.Kube, kind, name string) (*autoscalingv1.Scale, error) {
 	switch kind {
@@ -163,28 +136,7 @@ func GetPodsSelector(ctx context.Context, kube client.Kube, kind, name string) (
 
 		namespace = kube.Namespace
 		options.LabelSelector = "job-name"
-		postListFilter = func(ctx context.Context, kube client.Kube, pod v1.Pod) bool {
-			for _, podReference := range pod.OwnerReferences {
-				if podReference.Kind != "Job" {
-					continue
-				}
-
-				job, err := kube.BatchV1().Jobs(cronjob.Namespace).Get(ctx, podReference.Name, metav1.GetOptions{})
-				if err != nil {
-					kube.Warn("get job `%s`: %s", podReference.Name, err)
-
-					continue
-				}
-
-				for _, jobReference := range job.OwnerReferences {
-					if jobReference.UID == cronjob.UID {
-						return true
-					}
-				}
-			}
-
-			return false
-		}
+		postListFilter = cronJobPodFilter(cronjob)
 
 		return namespace, options, postListFilter, err
 
@@ -196,10 +148,67 @@ func GetPodsSelector(ctx context.Context, kube client.Kube, kind, name string) (
 		}
 
 		namespace = kube.Namespace
-		options.LabelSelector = labelSelectorFromMaps(labelSelector.MatchLabels)
+		options.LabelSelector, err = selectorFromLabelSelector(labelSelector)
 
 		return namespace, options, postListFilter, err
 	}
+}
+
+func cronJobPodFilter(cronjob *batchv1.CronJob) PodFilter {
+	var mutex sync.Mutex
+	owned := make(map[string]bool)
+
+	return func(ctx context.Context, kube client.Kube, pod v1.Pod) bool {
+		for _, podReference := range pod.OwnerReferences {
+			if podReference.Kind != "Job" {
+				continue
+			}
+
+			mutex.Lock()
+			isOwned, ok := owned[podReference.Name]
+			mutex.Unlock()
+
+			if !ok {
+				job, err := kube.BatchV1().Jobs(cronjob.Namespace).Get(ctx, podReference.Name, metav1.GetOptions{})
+				if err != nil {
+					kube.Warn("get job `%s`: %s", podReference.Name, err)
+
+					continue
+				}
+
+				for _, jobReference := range job.OwnerReferences {
+					if jobReference.UID == cronjob.UID {
+						isOwned = true
+
+						break
+					}
+				}
+
+				mutex.Lock()
+				owned[podReference.Name] = isOwned
+				mutex.Unlock()
+			}
+
+			if isOwned {
+				return true
+			}
+		}
+
+		return false
+	}
+}
+
+func selectorFromLabelSelector(labelSelector *metav1.LabelSelector) (string, error) {
+	if labelSelector == nil {
+		return "", errors.New("resource has no selector")
+	}
+
+	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
+	if err != nil {
+		return "", fmt.Errorf("convert label selector: %w", err)
+	}
+
+	return selector.String(), nil
 }
 
 func podLabelSelectorGetter(ctx context.Context, kube client.Kube, kind, name string) (*metav1.LabelSelector, error) {

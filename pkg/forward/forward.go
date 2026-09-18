@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/ViBiOh/kmux/pkg/client"
@@ -48,6 +46,10 @@ func (f Forwarder) WithDryRun(dryRun bool) Forwarder {
 }
 
 func (f Forwarder) Forward(ctx context.Context, kube client.Kube) error {
+	if !f.dryRun && f.pool == nil {
+		return errors.New("no local pool to forward to")
+	}
+
 	remotePort := f.remotePort
 
 	if resource.IsService(f.kind) {
@@ -76,7 +78,8 @@ func (f Forwarder) Forward(ctx context.Context, kube client.Kube) error {
 		defer close(podLimiter)
 	}
 
-	var activeForwarding sync.Map
+	active := newForwardSet()
+
 	var forwarding sync.WaitGroup
 
 	for event := range podWatcher.ResultChan() {
@@ -85,34 +88,30 @@ func (f Forwarder) Forward(ctx context.Context, kube client.Kube) error {
 			continue
 		}
 
-		remotePort := getForwardPort(pod, remotePort)
-		if remotePort == 0 {
-			kube.Err("port `%d` not found", remotePort)
-			continue
-		}
-
-		isContainerReady := isForwardPodReady(pod, remotePort)
-
-		forwardStop, ok := activeForwarding.Load(pod.UID)
-		if event.Type == watch.Deleted || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed || !isContainerReady {
-			if ok {
-				close(forwardStop.(chan struct{}))
-			}
+		podPort := getForwardPort(pod, remotePort)
+		if podPort == 0 {
+			kube.Err("port `%s` not found on pod %s", remotePort, pod.Name)
 
 			continue
 		}
 
-		if ok || pod.Status.Phase != v1.PodRunning || !isContainerReady {
+		isContainerReady := isForwardPodReady(pod, podPort)
+		isGone := event.Type == watch.Deleted || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed
+
+		if isGone || !isContainerReady {
+			active.stop(pod.UID)
+
 			continue
 		}
 
-		f.handleForwardPod(kube, &activeForwarding, &forwarding, *pod, remotePort, podLimiter)
+		if pod.Status.Phase != v1.PodRunning {
+			continue
+		}
+
+		f.handleForwardPod(kube, active, &forwarding, *pod, podPort, podLimiter)
 	}
 
-	activeForwarding.Range(func(key, value any) bool {
-		close(value.(chan struct{}))
-		return true
-	})
+	active.stopAll()
 
 	forwarding.Wait()
 
@@ -193,12 +192,14 @@ func getForwardContainer(pod *v1.Pod, remotePort int32) (string, bool) {
 	return "", false
 }
 
-func (f Forwarder) handleForwardPod(kube client.Kube, activeForwarding *sync.Map, forwarding *sync.WaitGroup, pod v1.Pod, remotePort int32, podLimiter chan struct{}) {
-	stopChan := make(chan struct{})
-	activeForwarding.Store(pod.UID, stopChan)
+func (f Forwarder) handleForwardPod(kube client.Kube, active *forwardSet, forwarding *sync.WaitGroup, pod v1.Pod, remotePort int32, podLimiter chan struct{}) {
+	stopChan, ok := active.add(pod.UID)
+	if !ok {
+		return
+	}
 
 	forwarding.Go(func() {
-		defer activeForwarding.Delete(pod.UID)
+		defer active.stop(pod.UID)
 
 		if podLimiter != nil {
 			select {
@@ -234,15 +235,18 @@ func (f Forwarder) handleForwardPod(kube client.Kube, activeForwarding *sync.Map
 }
 
 func listenPortForward(kube client.Kube, pod v1.Pod, stopChan chan struct{}, localPort, podPort int32) error {
-	path := fmt.Sprintf("/api/v1/namespaces/%s/pods/%s/portforward", pod.Namespace, pod.Name)
-	hostIP := strings.TrimPrefix(kube.Config.Host, "https://")
-
 	transport, upgrader, err := spdy.RoundTripperFor(kube.Config)
 	if err != nil {
 		return fmt.Errorf("transport: %w", err)
 	}
 
-	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, http.MethodPost, &url.URL{Scheme: "https", Path: path, Host: hostIP})
+	request := kube.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Namespace(pod.Namespace).
+		Name(pod.Name).
+		SubResource("portforward")
+
+	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, http.MethodPost, request.URL())
 	forwarder, err := portforward.New(dialer, []string{fmt.Sprintf("%d:%d", localPort, podPort)}, stopChan, nil, nil, kube.Outputter)
 	if err != nil {
 		return err

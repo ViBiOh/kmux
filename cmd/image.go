@@ -2,68 +2,30 @@ package cmd
 
 import (
 	"context"
-	"fmt"
-	"regexp"
-	"syscall"
 
 	"github.com/ViBiOh/kmux/pkg/client"
 	"github.com/ViBiOh/kmux/pkg/resource"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var imageCmd = &cobra.Command{
-	Use:   "image TYPE NAME",
-	Short: "Get all image names of containers for a given resource",
-	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		if len(args) == 0 {
-			return []string{
-				"cronjobs",
-				"daemonsets",
-				"deployments",
-				"jobs",
-				"pods",
-				"replicasets",
-				"statefulsets",
-			}, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		if len(args) == 1 {
-			lister, err := resource.ListerFor(args[0])
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveError
-			}
-
-			clients, err = getKubernetesClient(viper.GetStringSlice("context"))
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveError
-			}
-
-			return listObjects(cmd.Context(), viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
-		}
-
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	},
-	Args: cobra.MatchAll(cobra.ExactArgs(2), cobra.OnlyValidArgs),
+	Use:               "image TYPE NAME",
+	Short:             "Get all image names of containers for a given resource",
+	ValidArgsFunction: resourceCompletion(podTemplateKinds...),
+	Args:              cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := checkSingleNamespace(cmd); err != nil {
+			return err
+		}
+
 		kind := args[0]
 		name := args[1]
 
-		ctx, cancel := context.WithCancel(cmd.Context())
+		ctx, cancel := commandContext(cmd)
 		defer cancel()
 
-		go func() {
-			waitForEnd(syscall.SIGINT, syscall.SIGTERM)
-			cancel()
-		}()
-
-		if len(container) != 0 {
-			var err error
-
-			containerRegexp, err = regexp.Compile(container)
-			if err != nil {
-				return fmt.Errorf("container filter compile: %w", err)
-			}
+		if err := compileContainerFilter(); err != nil {
+			return err
 		}
 
 		clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
@@ -72,11 +34,7 @@ var imageCmd = &cobra.Command{
 				return err
 			}
 
-			for _, container := range append(podSpec.InitContainers, podSpec.Containers...) {
-				if !resource.IsContainedSelected(container, containerRegexp) {
-					continue
-				}
-
+			for _, container := range resource.SelectedContainers(podSpec, containerRegexp) {
 				kube.Std("%s", container.Image)
 			}
 

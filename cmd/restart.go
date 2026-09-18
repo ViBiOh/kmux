@@ -8,11 +8,12 @@ import (
 	"time"
 
 	"github.com/ViBiOh/kmux/pkg/client"
-	"github.com/ViBiOh/kmux/pkg/resource"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+	batchv1 "k8s.io/api/batch/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 var user string
@@ -28,40 +29,19 @@ type restartPatch struct {
 }
 
 var restartCmd = &cobra.Command{
-	Use:   "restart TYPE NAME",
-	Short: "Restart the given resource",
-	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		if len(args) == 0 {
-			return []string{
-				"daemonsets",
-				"deployments",
-				"jobs",
-				"statefulsets",
-			}, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		if len(args) == 1 {
-			lister, err := resource.ListerFor(args[0])
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveError
-			}
-
-			clients, err = getKubernetesClient(viper.GetStringSlice("context"))
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveError
-			}
-
-			return listObjects(cmd.Context(), viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
-		}
-
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	},
-	Args: cobra.MatchAll(cobra.ExactArgs(2), cobra.OnlyValidArgs),
+	Use:               "restart TYPE NAME",
+	Short:             "Restart the given resource",
+	ValidArgsFunction: resourceCompletion(restartKinds...),
+	Args:              cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := checkSingleNamespace(cmd); err != nil {
+			return err
+		}
+
 		kind := args[0]
 		name := args[1]
 
-		ctx, cancel := context.WithCancel(cmd.Context())
+		ctx, cancel := commandContext(cmd)
 		defer cancel()
 
 		var patch restartPatch
@@ -82,30 +62,22 @@ var restartCmd = &cobra.Command{
 			switch kind {
 			case "ds", "daemonset", "daemonsets":
 				_, err := kube.AppsV1().DaemonSets(kube.Namespace).Patch(ctx, name, types.MergePatchType, payload, v1.PatchOptions{})
+
 				return err
+
 			case "deploy", "deployment", "deployments":
 				_, err := kube.AppsV1().Deployments(kube.Namespace).Patch(ctx, name, types.MergePatchType, payload, v1.PatchOptions{})
+
 				return err
-			case "job", "jobs":
-				job, err := kube.BatchV1().Jobs(kube.Namespace).Get(ctx, name, v1.GetOptions{})
-				if err != nil {
-					return err
-				}
 
-				job.Spec.Selector = nil
-				job.Spec.Template.Labels = nil
-
-				if err = kube.BatchV1().Jobs(kube.Namespace).Delete(ctx, name, v1.DeleteOptions{}); err != nil {
-					return err
-				}
-
-				job.ResourceVersion = ""
-
-				_, err = kube.BatchV1().Jobs(kube.Namespace).Create(ctx, job, v1.CreateOptions{})
-				return err
 			case "sts", "statefulset", "statefulsets":
 				_, err := kube.AppsV1().StatefulSets(kube.Namespace).Patch(ctx, name, types.MergePatchType, payload, v1.PatchOptions{})
+
 				return err
+
+			case "job", "jobs":
+				return replaceJob(ctx, kube, name)
+
 			default:
 				return fmt.Errorf("unhandled resource type `%s` for restart", kind)
 			}
@@ -113,6 +85,52 @@ var restartCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func replaceJob(ctx context.Context, kube client.Kube, name string) error {
+	job, err := kube.BatchV1().Jobs(kube.Namespace).Get(ctx, name, v1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("get job: %w", err)
+	}
+
+	job.Spec.Selector = nil
+	delete(job.Spec.Template.Labels, "controller-uid")
+	delete(job.Spec.Template.Labels, "batch.kubernetes.io/controller-uid")
+	delete(job.Spec.Template.Labels, "job-name")
+	delete(job.Spec.Template.Labels, "batch.kubernetes.io/job-name")
+
+	job.ObjectMeta = v1.ObjectMeta{
+		Name:        job.Name,
+		Namespace:   job.Namespace,
+		Labels:      job.Labels,
+		Annotations: job.Annotations,
+	}
+	job.Status = batchv1.JobStatus{}
+
+	propagation := v1.DeletePropagationBackground
+	if err = kube.BatchV1().Jobs(kube.Namespace).Delete(ctx, name, v1.DeleteOptions{PropagationPolicy: &propagation}); err != nil {
+		return fmt.Errorf("delete job: %w", err)
+	}
+
+	if err = waitForJobDeletion(ctx, kube, name); err != nil {
+		return fmt.Errorf("wait for deletion: %w", err)
+	}
+
+	if _, err = kube.BatchV1().Jobs(kube.Namespace).Create(ctx, job, v1.CreateOptions{}); err != nil {
+		return fmt.Errorf("recreate job `%s`, it has been deleted: %w", name, err)
+	}
+
+	return nil
+}
+
+func waitForJobDeletion(ctx context.Context, kube client.Kube, name string) error {
+	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, time.Minute, true, func(ctx context.Context) (bool, error) {
+		if _, err := kube.BatchV1().Jobs(kube.Namespace).Get(ctx, name, v1.GetOptions{}); apierrors.IsNotFound(err) {
+			return true, nil
+		}
+
+		return false, nil
+	})
 }
 
 func initRestart() {

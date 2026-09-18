@@ -3,13 +3,12 @@ package cmd
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
-	"syscall"
 
 	"github.com/ViBiOh/kmux/pkg/client"
 	"github.com/ViBiOh/kmux/pkg/resource"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -19,49 +18,28 @@ var (
 )
 
 var scaleCmd = &cobra.Command{
-	Use:   "scale TYPE NAME",
-	Short: "Scale a resource by a given factor",
-	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		if len(args) == 0 {
-			return []string{
-				"deployments",
-				"replicasets",
-				"statefulsets",
-			}, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		if len(args) == 1 {
-			lister, err := resource.ListerFor(args[0])
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveError
-			}
-
-			clients, err = getKubernetesClient(viper.GetStringSlice("context"))
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveError
-			}
-
-			return listObjects(cmd.Context(), viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
-		}
-
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	},
-	Args: cobra.MatchAll(cobra.ExactArgs(2), cobra.OnlyValidArgs),
+	Use:               "scale TYPE NAME",
+	Short:             "Scale a resource by a given factor",
+	ValidArgsFunction: resourceCompletion(scaleKinds...),
+	Args:              cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := checkSingleNamespace(cmd); err != nil {
+			return err
+		}
+
 		kind := args[0]
 		name := args[1]
 
-		ctx, cancel := context.WithCancel(cmd.Context())
-		defer cancel()
-
-		go func() {
-			waitForEnd(syscall.SIGINT, syscall.SIGTERM)
-			cancel()
-		}()
+		if scaleFactor < 0 {
+			return fmt.Errorf("scale factor must be positive, got %g", scaleFactor)
+		}
 
 		if scaleFactor == 0 && !scaleForce {
 			return errors.New("use `--force` to confirm downscaling to zero pods")
 		}
+
+		ctx, cancel := commandContext(cmd)
+		defer cancel()
 
 		clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
 			scale, err := resource.GetScale(ctx, kube, kind, name)
@@ -70,10 +48,11 @@ var scaleCmd = &cobra.Command{
 			}
 
 			oldReplicas := scale.Spec.Replicas
-			scale.Spec.Replicas = int32(math.Ceil(float64(max(1, oldReplicas)) * scaleFactor))
+			scale.Spec.Replicas = scaledReplicas(oldReplicas, scaleFactor)
 
 			if oldReplicas == scale.Spec.Replicas {
 				kube.Std("No replica change from %d", scale.Spec.Replicas)
+
 				return nil
 			}
 
@@ -82,20 +61,34 @@ var scaleCmd = &cobra.Command{
 			switch kind {
 			case "deploy", "deployment", "deployments":
 				_, err := kube.AppsV1().Deployments(kube.Namespace).UpdateScale(ctx, name, scale, v1.UpdateOptions{})
+
 				return err
+
 			case "rs", "replicaset", "replicasets":
 				_, err := kube.AppsV1().ReplicaSets(kube.Namespace).UpdateScale(ctx, name, scale, v1.UpdateOptions{})
+
 				return err
+
 			case "sts", "statefulset", "statefulsets":
 				_, err := kube.AppsV1().StatefulSets(kube.Namespace).UpdateScale(ctx, name, scale, v1.UpdateOptions{})
-				return err
-			}
 
-			return nil
+				return err
+
+			default:
+				return fmt.Errorf("unhandled resource type `%s` for scale", kind)
+			}
 		})
 
 		return nil
 	},
+}
+
+func scaledReplicas(current int32, factor float64) int32 {
+	if factor == 0 {
+		return 0
+	}
+
+	return int32(math.Ceil(float64(max(1, current)) * factor))
 }
 
 func initScale() {

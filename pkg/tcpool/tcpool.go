@@ -2,10 +2,11 @@ package tcpool
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
-	"strings"
+	"slices"
 	"sync"
 
 	"github.com/ViBiOh/kmux/pkg/output"
@@ -13,6 +14,7 @@ import (
 
 type Pool struct {
 	done     chan struct{}
+	listener net.Listener
 	backends []string
 	current  uint64
 	mutex    sync.Mutex
@@ -20,8 +22,7 @@ type Pool struct {
 
 func New() *Pool {
 	return &Pool{
-		done:    make(chan struct{}),
-		current: ^uint64(0),
+		done: make(chan struct{}),
 	}
 }
 
@@ -42,16 +43,16 @@ func (bp *Pool) Remove(toRemove string) *Pool {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
 
-	backends := bp.backends[:0]
-	for _, backend := range bp.backends {
-		if backend == toRemove {
-			continue
-		}
-
-		backends = append(backends, backend)
+	index := slices.Index(bp.backends, toRemove)
+	if index < 0 {
+		return bp
 	}
 
-	bp.backends = backends
+	bp.backends = slices.Delete(bp.backends, index, index+1)
+
+	if uint64(index) < bp.current {
+		bp.current--
+	}
 
 	return bp
 }
@@ -60,74 +61,91 @@ func (bp *Pool) next() string {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
 
-	backendsLen := uint64(len(bp.backends))
-	if backendsLen == 0 {
+	if len(bp.backends) == 0 {
 		return ""
 	}
 
-	bp.current = (bp.current + 1) % backendsLen
+	backend := bp.backends[bp.current%uint64(len(bp.backends))]
+	bp.current = (bp.current + 1) % uint64(len(bp.backends))
 
-	return bp.backends[bp.current]
+	return backend
 }
 
-func (bp *Pool) handle(us net.Conn, server string) {
-	ds, err := net.Dial("tcp", server)
-	if err != nil {
-		output.Err("", "dial %s: %s", server, err)
+func (bp *Pool) handle(upstream net.Conn) {
+	backend := bp.next()
+	if len(backend) == 0 {
+		output.Err("", "no pod available to forward to")
 
-		if closeErr := us.Close(); closeErr != nil {
-			output.Err("", "close error: %s", closeErr)
-		}
+		closeWithLog(upstream)
 
 		return
 	}
 
-	go stream(ds, us)
-	go stream(us, ds)
+	downstream, err := net.Dial("tcp", backend)
+	if err != nil {
+		output.Err("", "dial %s: %s", backend, err)
+
+		closeWithLog(upstream)
+
+		return
+	}
+
+	go stream(downstream, upstream)
+	go stream(upstream, downstream)
 }
 
-func (bp *Pool) Start(ctx context.Context, localPort uint64) {
-	defer close(bp.done)
-
+func (bp *Pool) Listen(localPort uint64) error {
 	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", localPort))
 	if err != nil {
-		output.Err("", "listen: %s", err)
+		return fmt.Errorf("listen: %w", err)
+	}
+
+	bp.listener = listener
+
+	return nil
+}
+
+func (bp *Pool) Serve(ctx context.Context) {
+	defer close(bp.done)
+
+	if bp.listener == nil {
+		output.Err("", "serve without a listener")
+
 		return
 	}
 
 	go func() {
 		for {
-			conn, err := listener.Accept()
+			conn, err := bp.listener.Accept()
 			if err != nil {
-				if strings.HasSuffix(err.Error(), "use of closed network connection") {
+				if errors.Is(err, net.ErrClosed) {
 					return
 				}
 
 				output.Err("", "listener accept: %s", err)
+
 				continue
 			}
 
-			go bp.handle(conn, bp.next())
+			go bp.handle(conn)
 		}
 	}()
 
 	<-ctx.Done()
 
-	if closeErr := listener.Close(); closeErr != nil {
-		output.Err("", "listener close: %s", closeErr)
-	}
+	closeWithLog(bp.listener)
 }
 
 func stream(writer io.WriteCloser, reader io.Reader) {
-	defer func() {
-		if closeErr := writer.Close(); closeErr != nil {
-			output.Err("", "close error: %s", closeErr)
-		}
-	}()
+	defer closeWithLog(writer)
 
-	if _, err := io.Copy(writer, reader); err != nil {
-		if !strings.HasSuffix(err.Error(), "use of closed network connection") {
-			output.Err("", "pool copy: %s", err)
-		}
+	if _, err := io.Copy(writer, reader); err != nil && !errors.Is(err, net.ErrClosed) {
+		output.Err("", "pool copy: %s", err)
+	}
+}
+
+func closeWithLog(closer io.Closer) {
+	if err := closer.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+		output.Err("", "close: %s", err)
 	}
 }
