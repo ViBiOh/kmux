@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"regexp"
@@ -17,6 +18,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/watch"
 )
+
+// maxLineSize is the longest log line handled, JSON logs are easily above the
+// 64KiB default of bufio.Scanner.
+const maxLineSize = 1024 * 1024
 
 type Logger struct {
 	selector        map[string]string
@@ -98,7 +103,8 @@ func (l Logger) Log(ctx context.Context, kube client.Kube) error {
 
 	defer podWatcher.Stop()
 
-	var activeStreams sync.Map
+	streams := newStreamSet()
+
 	var streaming sync.WaitGroup
 
 	for event := range podWatcher.ResultChan() {
@@ -107,24 +113,30 @@ func (l Logger) Log(ctx context.Context, kube client.Kube) error {
 			continue
 		}
 
-		streamCancel, ok := activeStreams.Load(pod.UID)
+		isTerminated := pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed
+		isGone := event.Type == watch.Deleted || event.Type == watch.Error
 
-		if event.Type == watch.Deleted || event.Type == watch.Error || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
-			if ok {
-				streamCancel.(context.CancelFunc)()
-				activeStreams.Delete(pod.UID)
-			} else if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
-				l.handlePod(ctx, kube, &activeStreams, &streaming, *pod)
+		if isGone || isTerminated {
+			// a pod reaching its end is notified more than once, only act on the first one
+			if !streams.markTerminal(pod.UID) {
+				continue
 			}
 
+			// when streams were running they already output everything
+			if streams.cancelPod(pod.UID) || !isTerminated {
+				continue
+			}
+
+			l.handlePod(ctx, kube, streams, &streaming, *pod)
+
 			continue
 		}
 
-		if ok || pod.Status.Phase == v1.PodPending {
+		if pod.Status.Phase == v1.PodPending || streams.isTerminal(pod.UID) {
 			continue
 		}
 
-		l.handlePod(ctx, kube, &activeStreams, &streaming, *pod)
+		l.handlePod(ctx, kube, streams, &streaming, *pod)
 	}
 
 	streaming.Wait()
@@ -132,28 +144,29 @@ func (l Logger) Log(ctx context.Context, kube client.Kube) error {
 	return nil
 }
 
-func (l Logger) handlePod(ctx context.Context, kube client.Kube, activeStreams *sync.Map, streaming *sync.WaitGroup, pod v1.Pod) {
-	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		if !resource.IsContainedSelected(container, l.containerRegexp) {
+func (l Logger) handlePod(ctx context.Context, kube client.Kube, streams *streamSet, streaming *sync.WaitGroup, pod v1.Pod) {
+	for _, container := range resource.SelectedContainers(pod.Spec, l.containerRegexp) {
+		if l.dryRun {
+			kube.Info("%s %s", output.Green.Sprintf("[%s/%s]", pod.Name, container.Name), output.Yellow.Sprint("Found!"))
+
 			continue
 		}
 
-		container := container
+		if pod.Status.Phase != v1.PodRunning {
+			streaming.Go(func() {
+				l.logPod(ctx, kube, pod.Namespace, pod.Name, container.Name)
+			})
 
-		if l.dryRun {
-			kube.Info("%s %s", output.Green.Sprintf("[%s/%s]", pod.Name, container.Name), output.Yellow.Sprint("Found!"))
+			continue
+		}
+
+		streamCtx, ok := streams.add(ctx, pod.UID, container.Name)
+		if !ok {
 			continue
 		}
 
 		streaming.Go(func() {
-			if pod.Status.Phase != v1.PodRunning {
-				l.logPod(ctx, kube, pod.Namespace, pod.Name, container.Name)
-				return
-			}
-
-			streamCtx, streamCancel := context.WithCancel(ctx)
-			activeStreams.Store(pod.UID, streamCancel)
-			defer streamCancel()
+			defer streams.remove(pod.UID, container.Name)
 
 			l.streamPod(streamCtx, kube, pod.Namespace, pod.Name, container.Name)
 		})
@@ -162,11 +175,12 @@ func (l Logger) handlePod(ctx context.Context, kube client.Kube, activeStreams *
 
 func (l Logger) logPod(ctx context.Context, kube client.Kube, namespace, name, container string) {
 	content, err := kube.CoreV1().Pods(namespace).GetLogs(name, &v1.PodLogOptions{
-		SinceSeconds: &l.since,
+		SinceSeconds: l.sinceSeconds(),
 		Container:    container,
 	}).DoRaw(ctx)
 	if err != nil {
 		kube.Err("get logs: %s", err)
+
 		return
 	}
 
@@ -176,11 +190,12 @@ func (l Logger) logPod(ctx context.Context, kube client.Kube, namespace, name, c
 func (l Logger) streamPod(ctx context.Context, kube client.Kube, namespace, name, container string) {
 	stream, err := kube.CoreV1().Pods(namespace).GetLogs(name, &v1.PodLogOptions{
 		Follow:       !l.noFollow,
-		SinceSeconds: &l.since,
+		SinceSeconds: l.sinceSeconds(),
 		Container:    container,
 	}).Stream(ctx)
 	if err != nil {
 		kube.Err("stream logs: %s", err)
+
 		return
 	}
 
@@ -191,6 +206,15 @@ func (l Logger) streamPod(ctx context.Context, kube client.Kube, namespace, name
 	}()
 
 	l.outputLog(stream, l.logOutputter(kube, name, container))
+}
+
+// sinceSeconds returns nil for a non positive duration, the API rejects zero.
+func (l Logger) sinceSeconds() *int64 {
+	if l.since <= 0 {
+		return nil
+	}
+
+	return &l.since
 }
 
 func (l Logger) logOutputter(kube client.Kube, name, container string) output.Outputter {
@@ -204,36 +228,44 @@ func (l Logger) outputLog(reader io.Reader, outputter output.Outputter) {
 	}
 
 	streamScanner := bufio.NewScanner(reader)
+	streamScanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), maxLineSize)
 	streamScanner.Split(bufio.ScanLines)
 
-	var colorOutputter *color.Color
-
 	for streamScanner.Scan() {
-		text := streamScanner.Text()
-
-		colorOutputter = ColorOfJSON(text, l.jsonColorKeys...)
-
-		if colorIsGreater(colorOutputter, l.colorFilter) {
-			continue
-		}
-
-		if len(l.logRegexes) == 0 {
-			outputter.Std("%s", Format(text, colorOutputter))
-
-			continue
-		}
-
-		if !l.grepMatch(text) {
-			continue
-		}
-
-		greppedText := text
-		for _, logRegexp := range l.logRegexes {
-			greppedText = FormatGrep(greppedText, logRegexp, colorOutputter)
-		}
-
-		outputter.Std("%s", greppedText)
+		l.outputLine(streamScanner.Text(), outputter)
 	}
+
+	if err := streamScanner.Err(); err != nil {
+		if errors.Is(err, bufio.ErrTooLong) {
+			outputter.Err("log line above %d bytes, output truncated", maxLineSize)
+
+			return
+		}
+
+		if !errors.Is(err, context.Canceled) {
+			outputter.Err("read logs: %s", err)
+		}
+	}
+}
+
+func (l Logger) outputLine(text string, outputter output.Outputter) {
+	lineColor := ColorOfJSON(text, l.jsonColorKeys...)
+
+	if colorIsGreater(lineColor, l.colorFilter) {
+		return
+	}
+
+	if len(l.logRegexes) == 0 {
+		outputter.Std("%s", Format(text, lineColor))
+
+		return
+	}
+
+	if !l.grepMatch(text) {
+		return
+	}
+
+	outputter.Std("%s", FormatGrep(text, l.logRegexes, lineColor))
 }
 
 func (l Logger) grepMatch(text string) bool {

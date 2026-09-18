@@ -62,7 +62,7 @@ var rootCmd = &cobra.Command{
 func getKubernetesClient(contexts []string) (client.Array, error) {
 	var clientsArray client.Array
 
-	configRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: viper.GetString("kubeconfig")}
+	configRules := kubeConfigRules()
 
 	if len(contexts) == 0 {
 		contexts = append(contexts, "")
@@ -78,6 +78,30 @@ func getKubernetesClient(contexts []string) (client.Array, error) {
 	}
 
 	return clientsArray, nil
+}
+
+func defaultKubeConfig() string {
+	home := homedir.HomeDir()
+	if len(home) == 0 {
+		return ""
+	}
+
+	return filepath.Join(home, ".kube", "config")
+}
+
+// kubeConfigRules honours the standard kubeconfig lookup, `--kubeconfig` and
+// `KUBECONFIG` both accept a list of files merged by precedence.
+func kubeConfigRules() clientcmd.ClientConfigLoader {
+	rules := clientcmd.NewDefaultClientConfigLoadingRules()
+
+	configured := filepath.SplitList(viper.GetString("kubeconfig"))
+	if len(configured) == 1 {
+		rules.ExplicitPath = configured[0]
+	} else if len(configured) > 1 {
+		rules.Precedence = configured
+	}
+
+	return rules
 }
 
 func getKubeClient(configRules clientcmd.ClientConfigLoader, context string) (client.Kube, error) {
@@ -113,16 +137,14 @@ func getKubeClient(configRules clientcmd.ClientConfigLoader, context string) (cl
 }
 
 func init() {
+	// flags are also read from the environment, prefixed to avoid catching a
+	// generic `NAMESPACE` or `CONTEXT` from the user's shell
+	viper.SetEnvPrefix("KMUX")
 	viper.AutomaticEnv()
 
 	flags := rootCmd.PersistentFlags()
 
-	var defaultConfig string
-	if home := homedir.HomeDir(); home != "" {
-		defaultConfig = filepath.Join(home, ".kube", "config")
-	}
-
-	flags.String("kubeconfig", defaultConfig, "Kubernetes configuration file")
+	flags.String("kubeconfig", "", fmt.Sprintf("Kubernetes configuration file, %s separated (default %q, or $KUBECONFIG)", string(filepath.ListSeparator), defaultKubeConfig()))
 	if err := viper.BindPFlag("kubeconfig", flags.Lookup("kubeconfig")); err != nil {
 		output.Fatal("bind `kubeconfig` flag: %s", err)
 	}

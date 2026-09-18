@@ -6,7 +6,6 @@ import (
 	"path"
 	"sort"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/ViBiOh/kmux/pkg/client"
@@ -48,13 +47,8 @@ var watchCmd = &cobra.Command{
 	Use:   "watch",
 	Short: "Get all pods in the namespace",
 	Run: func(cmd *cobra.Command, args []string) {
-		ctx, cancel := context.WithCancel(cmd.Context())
+		ctx, cancel := commandContext(cmd)
 		defer cancel()
-
-		go func() {
-			waitForEnd(syscall.SIGINT, syscall.SIGTERM)
-			cancel()
-		}()
 
 		watchTable := initWatchTable()
 		initialsPodsHash := displayInitialPods(ctx, watchTable)
@@ -224,14 +218,10 @@ func outputWatch(watchTable *table.Table, contextName string, pod v1.Pod) {
 		since = duration.HumanDuration(time.Since(pod.Status.StartTime.Time))
 	}
 
-	var restartText string
-	if restart > 0 {
-		restartValue := fmt.Sprintf("%d", restart)
-		if !lastRestartDate.IsZero() {
-			restartValue += fmt.Sprintf(" (%s ago)", duration.HumanDuration(time.Since(lastRestartDate)))
-		}
-
-		restartText = fmt.Sprintf("%-14s", restartValue)
+	// the table pads the column, no need to align here
+	restartText := fmt.Sprintf("%d", restart)
+	if restart > 0 && !lastRestartDate.IsZero() {
+		restartText += fmt.Sprintf(" (%s ago)", duration.HumanDuration(time.Since(lastRestartDate)))
 	}
 
 	var readyColor *color.Color
@@ -434,7 +424,9 @@ func getPodStatus(pod v1.Pod) (string, uint, int, uint, time.Time) {
 		}
 	}
 
-	if pod.DeletionTimestamp != nil && pod.Status.Reason == "NodeUnreachablePodReason" {
+	// kubernetes sets this reason on pods of an unreachable node, the constant
+	// is named NodeUnreachablePodReason but its value is `NodeLost`
+	if pod.DeletionTimestamp != nil && pod.Status.Reason == "NodeLost" {
 		reason = "Unknown"
 	} else if pod.DeletionTimestamp != nil {
 		reason = "Terminating"

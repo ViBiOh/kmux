@@ -55,9 +55,15 @@ kmux --context central1 --context europe1 --context asia1 watch
 Global Flags:
   -A, --all-namespaces      Find resources in all namespaces
       --context strings     Kubernetes context, multiple for multiplexing commands
-      --kubeconfig string   Kubernetes configuration file (default "${HOME}/.kube/config")
+      --kubeconfig string   Kubernetes configuration file, : separated (default "${HOME}/.kube/config", or $KUBECONFIG)
   -n, --namespace string    Override kubernetes namespace in context
 ```
+
+`--kubeconfig` accepts a list of files, following the same precedence rules as `kubectl`, and falls back to `$KUBECONFIG` then `${HOME}/.kube/config`.
+
+Every flag can also be set from the environment, prefixed with `KMUX_`: `KMUX_NAMESPACE`, `KMUX_CONTEXT`, `KMUX_GREPCOLOR`, etc.
+
+`--all-namespaces` only applies to commands searching for pods (`watch`, `log`, `port-forward`). Commands acting on one named resource (`image`, `env`, `scale`, `restart`) need a namespace and reject it.
 
 ### `log`
 
@@ -72,7 +78,9 @@ If your logs are in JSON, you can also filter output based on their color:
 - ⬜️ `white`: Regular log (or unidentified)
 - 🟩 `green`: HTTP/3xx or `DEBUG`, `TRACE` level (case insensitive)
 
-Log levels and HTTP Status codes are determined by searching for keys defined in options `--statusCodeKeys` and `--levelKeys`. The most common values are defined by default. First match of level or http status code determine the color.
+Log levels and HTTP Status codes are determined by searching for keys defined in options `--statusCodeKeys` and `--levelKeys`. The most common values are defined by default. First match of level or http status code determine the color. Only keys of the root JSON object are considered, a nested object or a value equal to one of these keys is ignored.
+
+`--grepColor` accepts `red`, `yellow`, `white` or `green` and errors on anything else.
 
 The `--container` can be set to restrict output to the given containers' name.
 
@@ -103,7 +111,9 @@ Flags:
 
 Like `log`, `port-forward` command open a pod's watcher on a resource and port-forward to every container matching port and being ready. New pods matching the selector are automatically streamed.
 
-A local tcp load-balancer is started on given `local port` that will forward to underlying pods by using round-robin algorithm.
+A local tcp load-balancer is started on given `local port` that will forward to underlying pods by using round-robin algorithm. The local port is bound before any pod is forwarded, so a port already in use is reported right away.
+
+The `local_port` must be numeric, the `remote_port` can also be the name of a container's port.
 
 ```bash
 Port forward to pods of a resource
@@ -115,8 +125,8 @@ Aliases:
   port-forward, forward
 
 Flags:
-  -d, --dry-run      Dry-run, print only pods
-  -l, --limit uint   Limit forward to only n pods
+  -d, --dry-run     Dry-run, print only pods
+      --limit uint  Limit forward to only n pods
 ```
 
 ### `watch`
@@ -141,7 +151,7 @@ Flags:
 
 ### `restart`
 
-`restart` performs the equivalent of a rollout restart on given resource (add an annotation of the pod spec). For `job`, it's the equivalent of a replacement (delete then create).
+`restart` performs the equivalent of a rollout restart on given resource, by adding the `kmux.vibioh.fr/restartedAt` annotation (and `kmux.vibioh.fr/restartedBy` with `--user`) on the pod spec. For `job`, it's the equivalent of a replacement: the job is deleted, waited for, then created again. A job cannot be patched, so if the creation fails after the deletion, the job is reported as deleted and has to be applied again.
 
 ```bash
 Restart the given resource
@@ -171,6 +181,8 @@ Flags:
 
 `env` prints the configured environment variables from the given resource. When a value is dynamic (e.g. `hostIP`, `podIP`, etc.), the value from the most "live" pod is retrieved.
 
+Values coming from a `Secret` are printed in clear text, be careful when sharing the output.
+
 ```bash
 Get all configured environment variables of containers for a given resource
 
@@ -184,6 +196,8 @@ Flags:
 ### `scale`
 
 `scale` changes the `replicas` field on a replicable resource (deployment, replicaset, statefulset). It works by using a `scale factor`, you don't need to know the current replicas count.
+
+The factor must be positive and is applied on the current count, rounded up. A resource already scaled to zero counts as one, so `--factor 2` starts it back with two pods.
 
 ```bash
 Scale a resource by a given factor

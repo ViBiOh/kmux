@@ -11,16 +11,16 @@ import (
 
 type Kube struct {
 	output.Outputter
-	*kubernetes.Clientset
+	kubernetes.Interface
 	Config    *rest.Config
 	Name      string
 	Namespace string
 }
 
-func New(name, namespace string, config *rest.Config, clientset *kubernetes.Clientset) Kube {
+func New(name, namespace string, config *rest.Config, clientset kubernetes.Interface) Kube {
 	return Kube{
 		Outputter: output.NewOutputter(name),
-		Clientset: clientset,
+		Interface: clientset,
 		Config:    config,
 		Name:      name,
 		Namespace: namespace,

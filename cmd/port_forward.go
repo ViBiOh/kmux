@@ -1,92 +1,59 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"github.com/ViBiOh/kmux/pkg/forward"
 	"github.com/ViBiOh/kmux/pkg/output"
-	"github.com/ViBiOh/kmux/pkg/resource"
 	"github.com/ViBiOh/kmux/pkg/tcpool"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var limiter uint
 
 var portForwardCmd = &cobra.Command{
-	Use:     "port-forward TYPE NAME [local_port:]remote_port",
-	Aliases: []string{"forward"},
-	Short:   "Port forward to pods of a resource",
-	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		if len(args) == 0 {
-			return []string{
-				"daemonsets",
-				"deployments",
-				"pods",
-				"services",
-				"statefulsets",
-			}, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		if len(args) == 1 {
-			lister, err := resource.ListerFor(args[0])
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveError
-			}
-
-			clients, err = getKubernetesClient(viper.GetStringSlice("context"))
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveError
-			}
-
-			return listObjects(cmd.Context(), viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
-		}
-
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	},
-	Args: cobra.MatchAll(cobra.ExactArgs(3), cobra.OnlyValidArgs),
+	Use:               "port-forward TYPE NAME [local_port:]remote_port",
+	Aliases:           []string{"forward"},
+	Short:             "Port forward to pods of a resource",
+	ValidArgsFunction: resourceCompletion(forwardKinds...),
+	Args:              cobra.ExactArgs(3),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := checkSingleNamespace(cmd); err != nil {
+			return err
+		}
+
 		kind := args[0]
 		name := args[1]
-		rawPort := args[2]
 
-		ports := strings.SplitN(rawPort, ":", 2)
-
-		localPort, err := strconv.ParseUint(ports[0], 10, 32)
+		localPort, remotePort, err := parsePorts(args[2])
 		if err != nil {
-			return fmt.Errorf("invalid local port: %s", ports[0])
+			return err
 		}
 
-		var remotePort string
-		if len(ports) == 2 {
-			remotePort = ports[1]
-		} else {
-			remotePort = ports[0]
-		}
-
-		ctx, cancel := context.WithCancel(cmd.Context())
+		ctx, cancel := commandContext(cmd)
 		defer cancel()
 
-		output.Std("", "Listening tcp on %d", localPort)
-
 		var pool *tcpool.Pool
+
 		if !dryRun {
 			pool = tcpool.New()
-			go pool.Start(ctx, localPort)
+
+			if err := pool.Listen(localPort); err != nil {
+				return fmt.Errorf("listen locally: %w", err)
+			}
+
+			go pool.Serve(ctx)
+
+			output.Std("", "Listening tcp on %d", localPort)
 		}
 
-		go func() {
-			waitForEnd(syscall.SIGINT, syscall.SIGTERM)
-			cancel()
-		}()
-
-		forwarder := forward.NewForwarder(kind, name, remotePort, pool, limiter)
+		forwarder := forward.NewForwarder(kind, name, remotePort, pool, limiter).
+			WithDryRun(dryRun)
 
 		clients.Execute(ctx, forwarder.Forward)
+
 		cancel()
 
 		if pool != nil {
@@ -97,9 +64,29 @@ var portForwardCmd = &cobra.Command{
 	},
 }
 
+// parsePorts reads a `[local_port:]remote_port` argument, the remote port can
+// also be a container's port name.
+func parsePorts(rawPort string) (uint64, string, error) {
+	local, remote, hasLocal := strings.Cut(rawPort, ":")
+	if !hasLocal {
+		remote = local
+	}
+
+	localPort, err := strconv.ParseUint(local, 10, 16)
+	if err != nil {
+		return 0, "", fmt.Errorf("invalid local port `%s`", local)
+	}
+
+	if len(remote) == 0 {
+		return 0, "", fmt.Errorf("invalid remote port `%s`", rawPort)
+	}
+
+	return localPort, remote, nil
+}
+
 func initPortForward() {
 	flags := portForwardCmd.Flags()
 
 	flags.BoolVarP(&dryRun, "dry-run", "d", false, "Dry-run, print only pods")
-	flags.UintVarP(&limiter, "limit", "l", 0, "Limit forward to only n pods")
+	flags.UintVarP(&limiter, "limit", "", 0, "Limit forward to only n pods")
 }

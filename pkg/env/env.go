@@ -85,15 +85,7 @@ func (eg EnvGetter) Get(ctx context.Context, kube client.Kube) error {
 		node = *podNode
 	}
 
-	var containers []v1.Container
-
-	for _, container := range append(podSpec.InitContainers, podSpec.Containers...) {
-		if !resource.IsContainedSelected(container, eg.containerRegexp) {
-			continue
-		}
-
-		containers = append(containers, container)
-	}
+	containers := resource.SelectedContainers(podSpec, eg.containerRegexp)
 
 	for _, container := range containers {
 		values := getEnv(ctx, kube, container, mostLivePod, node)
@@ -120,38 +112,30 @@ func (eg EnvGetter) Get(ctx context.Context, kube client.Kube) error {
 	return nil
 }
 
+// phaseRanks orders phases from the most to the least useful to read live
+// values from, an unknown phase ranks last.
+var phaseRanks = map[v1.PodPhase]int{
+	v1.PodRunning:   0,
+	v1.PodSucceeded: 1,
+	v1.PodFailed:    2,
+	v1.PodPending:   3,
+	v1.PodUnknown:   4,
+}
+
 func getMostLivePod(pods []v1.Pod) v1.Pod {
-	for _, pod := range pods {
-		if pod.Status.Phase == v1.PodRunning {
-			return pod
-		}
-	}
+	best := v1.Pod{}
+	bestRank := len(phaseRanks)
 
 	for _, pod := range pods {
-		if pod.Status.Phase == v1.PodSucceeded {
-			return pod
+		rank, ok := phaseRanks[pod.Status.Phase]
+		if !ok || rank >= bestRank {
+			continue
 		}
+
+		best, bestRank = pod, rank
 	}
 
-	for _, pod := range pods {
-		if pod.Status.Phase == v1.PodFailed {
-			return pod
-		}
-	}
-
-	for _, pod := range pods {
-		if pod.Status.Phase == v1.PodPending {
-			return pod
-		}
-	}
-
-	for _, pod := range pods {
-		if pod.Status.Phase == v1.PodUnknown {
-			return pod
-		}
-	}
-
-	return v1.Pod{}
+	return best
 }
 
 func getEnv(ctx context.Context, kube client.Kube, container v1.Container, pod v1.Pod, node v1.Node) []envValue {
@@ -191,31 +175,40 @@ func getEnv(ctx context.Context, kube client.Kube, container v1.Container, pod v
 	return output
 }
 
+// getEnvDependencies fetches every configmap and secret referenced by the
+// container. Results are gathered in dedicated maps, the requested names are
+// only read while fanning out.
 func getEnvDependencies(ctx context.Context, kube client.Kube, container v1.Container) (map[string]map[string]string, map[string]map[string]string) {
-	configMaps, secrets := gatherEnvDependencies(container)
+	wantedConfigMaps, wantedSecrets := gatherEnvDependencies(container)
+
+	configMaps := make(map[string]map[string]string, len(wantedConfigMaps))
+	secrets := make(map[string]map[string]string, len(wantedSecrets))
 
 	var wg sync.WaitGroup
-	var mu sync.Mutex
+	var mutex sync.Mutex
 
-	for name := range configMaps {
+	for _, name := range wantedConfigMaps {
 		wg.Go(func() {
 			configMap, err := kube.CoreV1().ConfigMaps(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
 			if err != nil {
 				kube.Err("getting configmap `%s`: %s", name, err)
+
 				return
 			}
 
-			mu.Lock()
+			mutex.Lock()
+			defer mutex.Unlock()
+
 			configMaps[name] = configMap.Data
-			mu.Unlock()
 		})
 	}
 
-	for name := range secrets {
+	for _, name := range wantedSecrets {
 		wg.Go(func() {
 			secret, err := kube.CoreV1().Secrets(kube.Namespace).Get(ctx, name, metav1.GetOptions{})
 			if err != nil {
 				kube.Err("getting secret `%s`: %s", name, err)
+
 				return
 			}
 
@@ -224,9 +217,10 @@ func getEnvDependencies(ctx context.Context, kube client.Kube, container v1.Cont
 				data[key] = string(value)
 			}
 
-			mu.Lock()
+			mutex.Lock()
+			defer mutex.Unlock()
+
 			secrets[name] = data
-			mu.Unlock()
 		})
 	}
 
@@ -235,29 +229,45 @@ func getEnvDependencies(ctx context.Context, kube client.Kube, container v1.Cont
 	return configMaps, secrets
 }
 
-func gatherEnvDependencies(container v1.Container) (map[string]map[string]string, map[string]map[string]string) {
-	configMaps := make(map[string]map[string]string)
-	secrets := make(map[string]map[string]string)
+// gatherEnvDependencies returns the deduplicated names of the configmaps and
+// secrets a container reads its environment from.
+func gatherEnvDependencies(container v1.Container) ([]string, []string) {
+	configMaps := make(map[string]struct{})
+	secrets := make(map[string]struct{})
 
 	for _, env := range container.Env {
-		if env.ValueFrom != nil {
-			if env.ValueFrom.ConfigMapKeyRef != nil {
-				configMaps[env.ValueFrom.ConfigMapKeyRef.Name] = nil
-			} else if env.ValueFrom.SecretKeyRef != nil {
-				secrets[env.ValueFrom.SecretKeyRef.Name] = nil
-			}
+		if env.ValueFrom == nil {
+			continue
+		}
+
+		if env.ValueFrom.ConfigMapKeyRef != nil {
+			configMaps[env.ValueFrom.ConfigMapKeyRef.Name] = struct{}{}
+		} else if env.ValueFrom.SecretKeyRef != nil {
+			secrets[env.ValueFrom.SecretKeyRef.Name] = struct{}{}
 		}
 	}
 
 	for _, envFrom := range container.EnvFrom {
 		if envFrom.ConfigMapRef != nil {
-			configMaps[envFrom.ConfigMapRef.Name] = nil
+			configMaps[envFrom.ConfigMapRef.Name] = struct{}{}
 		} else if envFrom.SecretRef != nil {
-			secrets[envFrom.SecretRef.Name] = nil
+			secrets[envFrom.SecretRef.Name] = struct{}{}
 		}
 	}
 
-	return configMaps, secrets
+	return sortedKeys(configMaps), sortedKeys(secrets)
+}
+
+func sortedKeys(values map[string]struct{}) []string {
+	keys := make([]string, 0, len(values))
+
+	for key := range values {
+		keys = append(keys, key)
+	}
+
+	sort.Strings(keys)
+
+	return keys
 }
 
 func getEnvFromSource(storage map[string]map[string]string, kind, prefix, name string, optional *bool) (string, map[string]string) {
@@ -266,7 +276,7 @@ func getEnvFromSource(storage map[string]map[string]string, kind, prefix, name s
 
 	values, ok := storage[name]
 	if !ok {
-		if optional != nil && !*optional {
+		if isRequired(optional) {
 			content["error"] = fmt.Sprintf("<%s not optional and not found>", kind)
 
 			return keyName, content
@@ -315,7 +325,7 @@ func getValueFrom(pod v1.Pod, container v1.Container, node v1.Node, envVar v1.En
 func getValueFromRef(storage map[string]map[string]string, kind, name, key string, optional *bool) string {
 	values, ok := storage[name]
 	if !ok {
-		if optional != nil && !*optional {
+		if isRequired(optional) {
 			return fmt.Sprintf("<%s `%s` not optional and not found>", kind, name)
 		}
 
@@ -323,6 +333,12 @@ func getValueFromRef(storage map[string]map[string]string, kind, name, key strin
 	}
 
 	return values[key]
+}
+
+// isRequired reports whether a reference must exist, an unset `optional` means
+// required for kubernetes.
+func isRequired(optional *bool) bool {
+	return optional == nil || !*optional
 }
 
 func getEnvFieldRef(pod v1.Pod, field v1.ObjectFieldSelector) string {

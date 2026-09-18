@@ -1,18 +1,15 @@
 package cmd
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"regexp"
 	"slices"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/ViBiOh/kmux/pkg/log"
 	"github.com/ViBiOh/kmux/pkg/output"
-	"github.com/ViBiOh/kmux/pkg/resource"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -36,59 +33,20 @@ var (
 )
 
 var logCmd = &cobra.Command{
-	Use:     "log TYPE NAME",
-	Aliases: []string{"logs"},
-	Short:   "Get logs of a given resource",
-	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		if len(args) == 0 {
-			return []string{
-				"cronjobs",
-				"daemonsets",
-				"deployments",
-				"jobs",
-				"namespaces",
-				"nodes",
-				"pods",
-				"services",
-			}, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		if len(args) == 1 {
-			lister, err := resource.ListerFor(args[0])
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveError
-			}
-
-			clients, err = getKubernetesClient(viper.GetStringSlice("context"))
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveError
-			}
-
-			return listObjects(cmd.Context(), viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
-		}
-
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	},
+	Use:               "log TYPE NAME",
+	Aliases:           []string{"logs"},
+	Short:             "Get logs of a given resource",
+	ValidArgsFunction: resourceCompletion(logKinds...),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if !(len(args) == 2 || len(labelsSelector) != 0 || (len(args) == 1 && slices.Contains([]string{"ns", "namespace", "namespaces"}, args[0]))) {
-			return errors.New("either labels or `TYPE NAME` args must be specified")
+		if !hasLogTarget(args) {
+			return errors.New("either labels, `TYPE NAME` or a namespace must be specified")
 		}
 
-		ctx, cancel := context.WithCancel(cmd.Context())
+		ctx, cancel := commandContext(cmd)
 		defer cancel()
 
-		go func() {
-			waitForEnd(syscall.SIGINT, syscall.SIGTERM)
-			cancel()
-		}()
-
-		if len(container) != 0 {
-			var err error
-
-			containerRegexp, err = regexp.Compile(container)
-			if err != nil {
-				return fmt.Errorf("container filter compile: %w", err)
-			}
+		if err := compileContainerFilter(); err != nil {
+			return err
 		}
 
 		logRegexes := make([]*regexp.Regexp, len(logFilters))
@@ -104,6 +62,9 @@ var logCmd = &cobra.Command{
 
 		if grepColor := viper.GetString("grepColor"); len(grepColor) != 0 {
 			logColorFilter = log.ColorFromName(strings.ToLower(grepColor))
+			if logColorFilter == nil {
+				return fmt.Errorf("unknown color `%s`, expected one of %s", grepColor, strings.Join(log.ColorNames(), ", "))
+			}
 		}
 
 		if levelKeys := viper.GetStringSlice("levelKeys"); len(levelKeys) != 0 {
@@ -134,6 +95,21 @@ var logCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+// hasLogTarget tells whether pods can be found, either from a `TYPE NAME`
+// couple, a label selector or a whole namespace.
+func hasLogTarget(args []string) bool {
+	switch {
+	case len(args) == 2, len(labelsSelector) != 0:
+		return true
+
+	case len(args) == 1:
+		return slices.Contains([]string{"ns", "namespace", "namespaces"}, args[0])
+
+	default:
+		return false
+	}
 }
 
 func initLog() {

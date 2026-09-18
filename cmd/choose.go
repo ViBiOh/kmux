@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"sort"
+	"sync"
 
 	"github.com/ViBiOh/kmux/pkg/client"
 	"github.com/ViBiOh/kmux/pkg/resource"
@@ -20,63 +21,49 @@ func getNamespace(kube client.Kube, namespace string) string {
 	return ""
 }
 
+// listObjects returns the names found in every context, a name missing from one
+// of them is not proposed.
 func listObjects(ctx context.Context, namespace string, lister resource.Lister) []string {
-	output := make(chan string, len(clients))
-	successChan := make(chan struct{}, len(clients))
+	var mutex sync.Mutex
 
-	go func() {
-		defer close(output)
-		defer close(successChan)
-
-		clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
-			items, err := lister(ctx, kube, getNamespace(kube, namespace))
-			if err != nil {
-				return err
-			}
-
-			for _, item := range items {
-				output <- item
-			}
-
-			successChan <- struct{}{}
-
-			return nil
-		})
-	}()
-
-	var items []string
-	for item := range output {
-		items = append(items, item)
-	}
+	counts := make(map[string]uint64)
 
 	var successCount uint64
-	for range successChan {
+
+	clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
+		items, err := lister(ctx, kube, getNamespace(kube, namespace))
+		if err != nil {
+			return err
+		}
+
+		seen := make(map[string]struct{}, len(items))
+
+		mutex.Lock()
+		defer mutex.Unlock()
+
 		successCount++
+
+		for _, item := range items {
+			if _, ok := seen[item]; ok {
+				continue
+			}
+
+			seen[item] = struct{}{}
+			counts[item]++
+		}
+
+		return nil
+	})
+
+	items := make([]string, 0, len(counts))
+
+	for item, count := range counts {
+		if count == successCount {
+			items = append(items, item)
+		}
 	}
 
-	return uniqueAndPresent(items, successCount)
-}
-
-func uniqueAndPresent(items []string, wantedCount uint64) []string {
 	sort.Strings(items)
 
-	var count uint64
-	var previous string
-
-	unique := items[:0]
-
-	for _, item := range items {
-		if item == previous {
-			count++
-		} else {
-			count = 1
-			previous = item
-		}
-
-		if count == wantedCount {
-			unique = append(unique, previous)
-		}
-	}
-
-	return unique
+	return items
 }
