@@ -140,7 +140,7 @@ func TestSinceSeconds(t *testing.T) {
 		},
 		"one hour": {
 			time.Hour,
-			ptr(int64(3600)),
+			new(int64(3600)),
 		},
 	}
 
@@ -225,8 +225,4 @@ func TestGrepMatch(t *testing.T) {
 			assert.Equal(t, testCase.want, instance.grepMatch(testCase.text))
 		})
 	}
-}
-
-func ptr[T any](value T) *T {
-	return &value
 }

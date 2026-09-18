@@ -21,8 +21,6 @@ func getNamespace(kube client.Kube, namespace string) string {
 	return ""
 }
 
-// listObjects returns the names found in every context, a name missing from one
-// of them is not proposed.
 func listObjects(ctx context.Context, namespace string, lister resource.Lister) []string {
 	var mutex sync.Mutex
 

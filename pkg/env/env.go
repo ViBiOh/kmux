@@ -112,8 +112,6 @@ func (eg EnvGetter) Get(ctx context.Context, kube client.Kube) error {
 	return nil
 }
 
-// phaseRanks orders phases from the most to the least useful to read live
-// values from, an unknown phase ranks last.
 var phaseRanks = map[v1.PodPhase]int{
 	v1.PodRunning:   0,
 	v1.PodSucceeded: 1,
@@ -123,7 +121,7 @@ var phaseRanks = map[v1.PodPhase]int{
 }
 
 func getMostLivePod(pods []v1.Pod) v1.Pod {
-	best := v1.Pod{}
+	var best v1.Pod
 	bestRank := len(phaseRanks)
 
 	for _, pod := range pods {
@@ -175,9 +173,6 @@ func getEnv(ctx context.Context, kube client.Kube, container v1.Container, pod v
 	return output
 }
 
-// getEnvDependencies fetches every configmap and secret referenced by the
-// container. Results are gathered in dedicated maps, the requested names are
-// only read while fanning out.
 func getEnvDependencies(ctx context.Context, kube client.Kube, container v1.Container) (map[string]map[string]string, map[string]map[string]string) {
 	wantedConfigMaps, wantedSecrets := gatherEnvDependencies(container)
 
@@ -229,8 +224,6 @@ func getEnvDependencies(ctx context.Context, kube client.Kube, container v1.Cont
 	return configMaps, secrets
 }
 
-// gatherEnvDependencies returns the deduplicated names of the configmaps and
-// secrets a container reads its environment from.
 func gatherEnvDependencies(container v1.Container) ([]string, []string) {
 	configMaps := make(map[string]struct{})
 	secrets := make(map[string]struct{})
@@ -335,8 +328,6 @@ func getValueFromRef(storage map[string]map[string]string, kind, name, key strin
 	return values[key]
 }
 
-// isRequired reports whether a reference must exist, an unset `optional` means
-// required for kubernetes.
 func isRequired(optional *bool) bool {
 	return optional == nil || !*optional
 }

@@ -154,8 +154,6 @@ func GetPodsSelector(ctx context.Context, kube client.Kube, kind, name string) (
 	}
 }
 
-// cronJobPodFilter keeps pods owned by a job owned by the given cronjob. Jobs
-// are resolved once, the filter is called for every pod and every event.
 func cronJobPodFilter(cronjob *batchv1.CronJob) PodFilter {
 	var mutex sync.Mutex
 	owned := make(map[string]bool)
@@ -200,8 +198,6 @@ func cronJobPodFilter(cronjob *batchv1.CronJob) PodFilter {
 	}
 }
 
-// selectorFromLabelSelector renders a label selector, honouring both
-// matchLabels and matchExpressions.
 func selectorFromLabelSelector(labelSelector *metav1.LabelSelector) (string, error) {
 	if labelSelector == nil {
 		return "", errors.New("resource has no selector")

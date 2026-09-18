@@ -24,8 +24,6 @@ func IsContainerSelected(container v1.Container, filter *regexp.Regexp) bool {
 	return filter.MatchString(container.Name)
 }
 
-// SelectedContainers returns the init containers then the regular ones matching
-// the filter, without aliasing the given spec.
 func SelectedContainers(spec v1.PodSpec, filter *regexp.Regexp) []v1.Container {
 	containers := slices.Concat(spec.InitContainers, spec.Containers)
 

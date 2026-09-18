@@ -87,14 +87,12 @@ var restartCmd = &cobra.Command{
 	},
 }
 
-// replaceJob deletes then recreates a job, a job's spec being mostly immutable.
 func replaceJob(ctx context.Context, kube client.Kube, name string) error {
 	job, err := kube.BatchV1().Jobs(kube.Namespace).Get(ctx, name, v1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("get job: %w", err)
 	}
 
-	// the controller sets them back, keeping them would collide with the deleted job
 	job.Spec.Selector = nil
 	delete(job.Spec.Template.Labels, "controller-uid")
 	delete(job.Spec.Template.Labels, "batch.kubernetes.io/controller-uid")
@@ -115,7 +113,7 @@ func replaceJob(ctx context.Context, kube client.Kube, name string) error {
 	}
 
 	if err = waitForJobDeletion(ctx, kube, name); err != nil {
-		return err
+		return fmt.Errorf("wait for deletion: %w", err)
 	}
 
 	if _, err = kube.BatchV1().Jobs(kube.Namespace).Create(ctx, job, v1.CreateOptions{}); err != nil {
@@ -125,12 +123,9 @@ func replaceJob(ctx context.Context, kube client.Kube, name string) error {
 	return nil
 }
 
-// waitForJobDeletion waits for the job to be gone, creating it back too early
-// fails with an already exists error.
 func waitForJobDeletion(ctx context.Context, kube client.Kube, name string) error {
 	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, time.Minute, true, func(ctx context.Context) (bool, error) {
-		_, err := kube.BatchV1().Jobs(kube.Namespace).Get(ctx, name, v1.GetOptions{})
-		if apierrors.IsNotFound(err) {
+		if _, err := kube.BatchV1().Jobs(kube.Namespace).Get(ctx, name, v1.GetOptions{}); apierrors.IsNotFound(err) {
 			return true, nil
 		}
 

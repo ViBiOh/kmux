@@ -22,8 +22,6 @@ func New(defaultWidths []uint64) *Table {
 	}
 }
 
-// Format renders cells padded to the widest content seen so far. It is safe for
-// concurrent use, one goroutine per cluster formats on the same table.
 func (t *Table) Format(cells []Cell) string {
 	var builder strings.Builder
 

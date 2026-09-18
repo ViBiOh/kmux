@@ -7,9 +7,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// streamSet tracks the running streams, one per pod's container. Registration
-// happens before the stream starts so two events for the same pod cannot open
-// the same stream twice.
 type streamSet struct {
 	streams  map[streamKey]context.CancelFunc
 	terminal map[types.UID]bool
@@ -28,7 +25,6 @@ func newStreamSet() *streamSet {
 	}
 }
 
-// add registers a stream and returns its context, false when it is already running.
 func (s *streamSet) add(ctx context.Context, pod types.UID, container string) (context.Context, bool) {
 	key := streamKey{pod: pod, container: container}
 
@@ -58,7 +54,6 @@ func (s *streamSet) remove(pod types.UID, container string) {
 	}
 }
 
-// cancelPod stops every stream of a pod and tells whether there was any.
 func (s *streamSet) cancelPod(pod types.UID) bool {
 	s.mutex.Lock()
 
@@ -80,7 +75,6 @@ func (s *streamSet) cancelPod(pod types.UID) bool {
 	return len(cancels) > 0
 }
 
-// markTerminal flags a pod as done and returns false if it already was.
 func (s *streamSet) markTerminal(pod types.UID) bool {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()

@@ -29,7 +29,6 @@ var colorRanks = map[*color.Color]uint{
 
 var errKeyNotFound = errors.New("key not found")
 
-// ColorNames returns the accepted color names, higher severity first.
 func ColorNames() []string {
 	names := make([]string, 0, len(colorNames))
 
@@ -111,8 +110,6 @@ func ColorOfJSON(content string, keys ...string) *color.Color {
 	}
 }
 
-// moveDecoderToKey leaves the decoder right after one of the wanted keys of the
-// root object. Only keys are considered, a value equal to a key name is skipped.
 func moveDecoderToKey(decoder *json.Decoder, keys ...string) error {
 	var depth uint64
 
@@ -138,9 +135,7 @@ func moveDecoderToKey(decoder *json.Decoder, keys ...string) error {
 				}
 			}
 
-			// entering or leaving a container always leaves us on a key of the current object
 			expectKey = depth == 1
-
 			continue
 		}
 

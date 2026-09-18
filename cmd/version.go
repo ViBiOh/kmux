@@ -7,8 +7,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Version is set at release time, it falls back to the module version when
-// installed with `go install`.
 var Version string
 
 var versionCmd = &cobra.Command{

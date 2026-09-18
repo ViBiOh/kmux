@@ -19,8 +19,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
-// maxLineSize is the longest log line handled, JSON logs are easily above the
-// 64KiB default of bufio.Scanner.
 const maxLineSize = 1024 * 1024
 
 type Logger struct {
@@ -117,12 +115,10 @@ func (l Logger) Log(ctx context.Context, kube client.Kube) error {
 		isGone := event.Type == watch.Deleted || event.Type == watch.Error
 
 		if isGone || isTerminated {
-			// a pod reaching its end is notified more than once, only act on the first one
 			if !streams.markTerminal(pod.UID) {
 				continue
 			}
 
-			// when streams were running they already output everything
 			if streams.cancelPod(pod.UID) || !isTerminated {
 				continue
 			}
@@ -208,7 +204,6 @@ func (l Logger) streamPod(ctx context.Context, kube client.Kube, namespace, name
 	l.outputLog(stream, l.logOutputter(kube, name, container))
 }
 
-// sinceSeconds returns nil for a non positive duration, the API rejects zero.
 func (l Logger) sinceSeconds() *int64 {
 	if l.since <= 0 {
 		return nil

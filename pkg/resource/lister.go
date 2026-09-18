@@ -70,8 +70,6 @@ func ListerFor(kind string) (Lister, error) {
 	}
 }
 
-// itemsName extracts the name of every listed object. The list error is
-// forwarded so every kind stays a one liner.
 func itemsName(list runtime.Object, err error) ([]string, error) {
 	if err != nil {
 		return nil, err

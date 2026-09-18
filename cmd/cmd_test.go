@@ -16,10 +16,6 @@ import (
 
 const testNamespace = "default"
 
-func ptr[T any](value T) *T {
-	return &value
-}
-
 func deployment(name, namespace string) runtime.Object {
 	return &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace}}
 }

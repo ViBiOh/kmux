@@ -38,9 +38,6 @@ func newPrinter(stdout, stderr io.Writer) *printer {
 	}
 }
 
-// start consumes events until close is called. Writes are buffered, a buffer is
-// flushed before writing on the other one so the relative order of stdout and
-// stderr is kept when both are attached to the same terminal.
 func (p *printer) start() {
 	defer close(p.done)
 
@@ -107,8 +104,6 @@ func flush(writers ...*bufio.Writer) {
 	}
 }
 
-// Close stops the printer, it is safe to call it more than once and any output
-// sent afterwards is dropped instead of panicking.
 func Close() {
 	defaultPrinter.close()
 }

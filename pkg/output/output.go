@@ -33,8 +33,6 @@ func Info(prefix, format string, args ...any) {
 	outputContent(false, prefix, fmt.Sprintf(format, args...))
 }
 
-// Fatal drains the pending output before printing the error, so nothing queued
-// is lost when exiting.
 func Fatal(format string, args ...any) {
 	Close()
 	<-Done()

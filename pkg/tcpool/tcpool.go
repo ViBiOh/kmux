@@ -50,7 +50,6 @@ func (bp *Pool) Remove(toRemove string) *Pool {
 
 	bp.backends = slices.Delete(bp.backends, index, index+1)
 
-	// keep the rotation on the same backend as before the deletion
 	if uint64(index) < bp.current {
 		bp.current--
 	}
@@ -58,8 +57,6 @@ func (bp *Pool) Remove(toRemove string) *Pool {
 	return bp
 }
 
-// next returns the next backend in a round-robin fashion, empty when the pool
-// has no backend.
 func (bp *Pool) next() string {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
@@ -97,8 +94,6 @@ func (bp *Pool) handle(upstream net.Conn) {
 	go stream(upstream, downstream)
 }
 
-// Listen binds the local port, so a port already in use is reported before
-// anything is forwarded.
 func (bp *Pool) Listen(localPort uint64) error {
 	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", localPort))
 	if err != nil {
@@ -110,8 +105,6 @@ func (bp *Pool) Listen(localPort uint64) error {
 	return nil
 }
 
-// Serve accepts connections until the context is done, Listen must have
-// succeeded first.
 func (bp *Pool) Serve(ctx context.Context) {
 	defer close(bp.done)
 

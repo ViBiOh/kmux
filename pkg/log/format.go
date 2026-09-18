@@ -17,9 +17,6 @@ func Format(text string, outputter *color.Color) string {
 	return outputter.Sprint(text)
 }
 
-// FormatGrep highlights every match of every filter. Matches are all computed
-// on the raw text then merged, colorizing between passes would make the next
-// filter match the escape sequences.
 func FormatGrep(text string, logFilters []*regexp.Regexp, outputter *color.Color) string {
 	matches := mergeMatches(text, logFilters)
 	if len(matches) == 0 {
@@ -32,7 +29,6 @@ func FormatGrep(text string, logFilters []*regexp.Regexp, outputter *color.Color
 	}
 
 	var greppedText strings.Builder
-
 	var currentIndex int
 
 	for _, match := range matches {
@@ -41,7 +37,6 @@ func FormatGrep(text string, logFilters []*regexp.Regexp, outputter *color.Color
 		}
 
 		greppedText.WriteString(highlight.Sprint(text[match[0]:match[1]]))
-
 		currentIndex = match[1]
 	}
 
@@ -52,7 +47,6 @@ func FormatGrep(text string, logFilters []*regexp.Regexp, outputter *color.Color
 	return greppedText.String()
 }
 
-// mergeMatches returns the sorted, non overlapping match indexes of all filters.
 func mergeMatches(text string, logFilters []*regexp.Regexp) [][]int {
 	var matches [][]int
 

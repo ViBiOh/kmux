@@ -83,8 +83,6 @@ var scaleCmd = &cobra.Command{
 	},
 }
 
-// scaledReplicas applies the factor, a resource scaled down to zero is scaled
-// back from one so it can be started again.
 func scaledReplicas(current int32, factor float64) int32 {
 	if factor == 0 {
 		return 0

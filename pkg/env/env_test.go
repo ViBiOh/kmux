@@ -20,10 +20,6 @@ func newKube(objects ...runtime.Object) client.Kube {
 	return client.New("test", testNamespace, nil, fake.NewClientset(objects...))
 }
 
-func ptr[T any](value T) *T {
-	return &value
-}
-
 func TestGetMostLivePod(t *testing.T) {
 	t.Parallel()
 
@@ -157,12 +153,12 @@ func TestGetEnvFromSource(t *testing.T) {
 			map[string]string{"error": "<configmap not optional and not found>"},
 		},
 		"missing and explicitly required": {
-			"missing", "", ptr(false),
+			"missing", "", new(false),
 			"configmap missing",
 			map[string]string{"error": "<configmap not optional and not found>"},
 		},
 		"missing and optional": {
-			"missing", "", ptr(true),
+			"missing", "", new(true),
 			"configmap missing",
 			map[string]string{},
 		},
@@ -206,7 +202,7 @@ func TestGetValueFromRef(t *testing.T) {
 			"<secret `missing` not optional and not found>",
 		},
 		"missing and optional": {
-			"missing", "password", ptr(true),
+			"missing", "password", new(true),
 			"",
 		},
 	}

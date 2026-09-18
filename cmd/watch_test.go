@@ -205,7 +205,7 @@ func TestGetPodStatus(t *testing.T) {
 					InitContainerStatuses: []v1.ContainerStatus{{
 						Name:    "sidecar",
 						Ready:   true,
-						Started: ptr(true),
+						Started: new(true),
 						State:   v1.ContainerState{Running: &v1.ContainerStateRunning{}},
 					}},
 					ContainerStatuses: []v1.ContainerStatus{{
@@ -220,7 +220,7 @@ func TestGetPodStatus(t *testing.T) {
 		},
 		"terminating pod": {
 			v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: ptr(metav1.Now())},
+				ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: new(metav1.Now())},
 				Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "app"}}},
 				Status: v1.PodStatus{
 					Phase: v1.PodRunning,
@@ -236,7 +236,7 @@ func TestGetPodStatus(t *testing.T) {
 		},
 		"pod of a lost node": {
 			v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: ptr(metav1.Now())},
+				ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: new(metav1.Now())},
 				Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "app"}}},
 				Status:     v1.PodStatus{Phase: v1.PodRunning, Reason: "NodeLost"},
 			},

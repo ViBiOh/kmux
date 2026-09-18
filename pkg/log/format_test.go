@@ -10,8 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestMain forces the colors on, they are disabled when the output is not a
-// terminal and every color assertion would compare plain strings.
 func TestMain(m *testing.M) {
 	color.NoColor = false
 
@@ -126,8 +124,6 @@ func TestFormatGrep(t *testing.T) {
 	}
 }
 
-// TestFormatGrepDoesNotMatchEscapeCodes guards the previous behaviour, where
-// each filter was applied on the output of the previous one.
 func TestFormatGrepDoesNotMatchEscapeCodes(t *testing.T) {
 	t.Parallel()
 
