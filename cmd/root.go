@@ -89,8 +89,6 @@ func defaultKubeConfig() string {
 	return filepath.Join(home, ".kube", "config")
 }
 
-// kubeConfigRules honours the standard kubeconfig lookup, `--kubeconfig` and
-// `KUBECONFIG` both accept a list of files merged by precedence.
 func kubeConfigRules() clientcmd.ClientConfigLoader {
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()
 
@@ -137,8 +135,6 @@ func getKubeClient(configRules clientcmd.ClientConfigLoader, context string) (cl
 }
 
 func init() {
-	// flags are also read from the environment, prefixed to avoid catching a
-	// generic `NAMESPACE` or `CONTEXT` from the user's shell
 	viper.SetEnvPrefix("KMUX")
 	viper.AutomaticEnv()
 
@@ -224,7 +220,7 @@ func completeNamespace(cmd *cobra.Command, _ []string, _ string) ([]string, cobr
 		return nil, cobra.ShellCompDirectiveError
 	}
 
-	return listObjects(cmd.Context(), "", lister), cobra.ShellCompDirectiveDefault
+	return listCommonObjects(cmd.Context(), "", lister), cobra.ShellCompDirectiveDefault
 }
 
 func contains(arr []string, value string) bool {

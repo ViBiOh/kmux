@@ -21,7 +21,7 @@ func getNamespace(kube client.Kube, namespace string) string {
 	return ""
 }
 
-func listObjects(ctx context.Context, namespace string, lister resource.Lister) []string {
+func listCommonObjects(ctx context.Context, namespace string, lister resource.Lister) []string {
 	var mutex sync.Mutex
 
 	counts := make(map[string]uint64)

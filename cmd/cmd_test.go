@@ -254,7 +254,7 @@ func TestListObjects(t *testing.T) {
 		t.Run(intention, func(t *testing.T) {
 			clients = testCase.clients
 
-			assert.Equal(t, testCase.want, listObjects(context.Background(), testNamespace, lister))
+			assert.Equal(t, testCase.want, listCommonObjects(context.Background(), testNamespace, lister))
 		})
 	}
 }

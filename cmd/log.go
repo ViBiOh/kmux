@@ -61,8 +61,7 @@ var logCmd = &cobra.Command{
 		}
 
 		if grepColor := viper.GetString("grepColor"); len(grepColor) != 0 {
-			logColorFilter = log.ColorFromName(strings.ToLower(grepColor))
-			if logColorFilter == nil {
+			if logColorFilter = log.ColorFromName(strings.ToLower(grepColor)); logColorFilter == nil {
 				return fmt.Errorf("unknown color `%s`, expected one of %s", grepColor, strings.Join(log.ColorNames(), ", "))
 			}
 		}
@@ -97,8 +96,6 @@ var logCmd = &cobra.Command{
 	},
 }
 
-// hasLogTarget tells whether pods can be found, either from a `TYPE NAME`
-// couple, a label selector or a whole namespace.
 func hasLogTarget(args []string) bool {
 	switch {
 	case len(args) == 2, len(labelsSelector) != 0:

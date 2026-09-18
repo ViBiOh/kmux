@@ -240,7 +240,6 @@ func listenPortForward(kube client.Kube, pod v1.Pod, stopChan chan struct{}, loc
 		return fmt.Errorf("transport: %w", err)
 	}
 
-	// the request builds the URL from the config, keeping the scheme and any API path prefix
 	request := kube.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Namespace(pod.Namespace).

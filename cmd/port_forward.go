@@ -64,8 +64,6 @@ var portForwardCmd = &cobra.Command{
 	},
 }
 
-// parsePorts reads a `[local_port:]remote_port` argument, the remote port can
-// also be a container's port name.
 func parsePorts(rawPort string) (uint64, string, error) {
 	local, remote, hasLocal := strings.Cut(rawPort, ":")
 	if !hasLocal {

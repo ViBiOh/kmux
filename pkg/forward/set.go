@@ -6,9 +6,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// forwardSet tracks the stop channel of every running port-forward. Stopping is
-// idempotent, a pod flapping its readiness notifies more than once and closing
-// a channel twice would panic.
 type forwardSet struct {
 	forwards map[types.UID]chan struct{}
 	mutex    sync.Mutex
@@ -20,7 +17,6 @@ func newForwardSet() *forwardSet {
 	}
 }
 
-// add registers a pod and returns its stop channel, false when it is already forwarded.
 func (f *forwardSet) add(pod types.UID) (chan struct{}, bool) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()

@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-// kinds accepted by each command, in completion order.
 var (
 	podTemplateKinds = []string{"cronjobs", "daemonsets", "deployments", "jobs", "pods", "replicasets", "statefulsets"}
 	logKinds         = []string{"cronjobs", "daemonsets", "deployments", "jobs", "namespaces", "nodes", "pods", "services"}
@@ -42,7 +41,7 @@ func resourceCompletion(kinds ...string) func(*cobra.Command, []string, string) 
 				return nil, cobra.ShellCompDirectiveError
 			}
 
-			return listObjects(cmd.Context(), viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
+			return listCommonObjects(cmd.Context(), viper.GetString("namespace"), lister), cobra.ShellCompDirectiveNoFileComp
 
 		default:
 			return nil, cobra.ShellCompDirectiveNoFileComp
