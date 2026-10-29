@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"context"
-	"sort"
+	"slices"
 	"sync"
 
 	"github.com/ViBiOh/kmux/pkg/client"
@@ -61,7 +61,7 @@ func listCommonObjects(ctx context.Context, namespace string, lister resource.Li
 		}
 	}
 
-	sort.Strings(items)
+	slices.Sort(items)
 
 	return items
 }

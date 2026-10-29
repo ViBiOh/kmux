@@ -365,22 +365,21 @@ func TestMapAsString(t *testing.T) {
 	}
 }
 
-func TestPodByAge(t *testing.T) {
+func TestComparePodsByAge(t *testing.T) {
 	t.Parallel()
 
 	older := metav1.NewTime(time.Date(2024, time.March, 1, 10, 0, 0, 0, time.UTC))
 	newer := metav1.NewTime(time.Date(2024, time.March, 2, 10, 0, 0, 0, time.UTC))
 
-	pods := PodByAge{
+	pods := []watchPod{
 		{Pod: v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "newer"}, Status: v1.PodStatus{StartTime: &newer}}},
 		{Pod: v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "without start time"}}},
 		{Pod: v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "older"}, Status: v1.PodStatus{StartTime: &older}}},
 	}
 
-	assert.Equal(t, 3, pods.Len())
-	assert.True(t, pods.Less(2, 0), "older is before newer")
-	assert.False(t, pods.Less(0, 2))
-	assert.False(t, pods.Less(1, 0), "a pod without start time is never before")
+	assert.Negative(t, comparePodsByAge(pods[2], pods[0]), "older is before newer")
+	assert.Positive(t, comparePodsByAge(pods[0], pods[2]))
+	assert.Zero(t, comparePodsByAge(pods[1], pods[0]), "a pod without start time is never before")
 }
 
 // TestOutputWatchDoesNotPanic is not parallel, it reads the shared output flags.

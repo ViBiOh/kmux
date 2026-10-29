@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -37,7 +37,7 @@ func (ev envValue) String() string {
 		entries = append(entries, fmt.Sprintf("%s=%s\n", key, value))
 	}
 
-	sort.Strings(entries)
+	slices.Sort(entries)
 
 	return header + strings.Join(entries, "")
 }
@@ -258,7 +258,7 @@ func sortedKeys(values map[string]struct{}) []string {
 		keys = append(keys, key)
 	}
 
-	sort.Strings(keys)
+	slices.Sort(keys)
 
 	return keys
 }

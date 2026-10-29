@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -180,7 +180,7 @@ func displayInitialPods(ctx context.Context, watchTable *table.Table) map[string
 	close(initialPods)
 	<-done
 
-	sort.Sort(PodByAge(listPods))
+	slices.SortStableFunc(listPods, comparePodsByAge)
 	initialsPodsHash := make(map[string]bool)
 
 	for _, pod := range listPods {
@@ -191,13 +191,15 @@ func displayInitialPods(ctx context.Context, watchTable *table.Table) map[string
 	return initialsPodsHash
 }
 
-// PodByAge sort watchPod by Age.
-type PodByAge []watchPod
-
-func (a PodByAge) Len() int      { return len(a) }
-func (a PodByAge) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a PodByAge) Less(i, j int) bool {
-	return a[i].Status.StartTime.Before(a[j].Status.StartTime)
+func comparePodsByAge(a, b watchPod) int {
+	switch {
+	case a.Status.StartTime.Before(b.Status.StartTime):
+		return -1
+	case b.Status.StartTime.Before(a.Status.StartTime):
+		return 1
+	default:
+		return 0
+	}
 }
 
 func outputWatch(watchTable *table.Table, contextName string, pod v1.Pod) {
@@ -293,7 +295,7 @@ func mapAsString(labels map[string]string) string {
 		index++
 	}
 
-	sort.Strings(values)
+	slices.Sort(values)
 
 	return strings.Join(values, ",")
 }
