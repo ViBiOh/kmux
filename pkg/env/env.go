@@ -29,12 +29,12 @@ type envValue struct {
 }
 
 func (ev envValue) String() string {
-	header := output.Yellow.Sprintf("# %s\n", ev.source)
+	header := output.Yellow.Sprintf("# %s\n", output.Sanitize(ev.source))
 
 	entries := make([]string, 0, len(ev.data))
 
 	for key, value := range ev.data {
-		entries = append(entries, fmt.Sprintf("%s=%s\n", key, value))
+		entries = append(entries, fmt.Sprintf("%s=%s\n", output.Sanitize(key), output.Sanitize(value)))
 	}
 
 	slices.Sort(entries)

@@ -87,3 +87,12 @@ func TestFormatConcurrently(t *testing.T) {
 
 	assert.Equal(t, []uint64{5, 9, 1}, instance.widths)
 }
+
+func TestNewCellSingleLine(t *testing.T) {
+	t.Parallel()
+
+	cell := NewCell("a\nb\tc\x1b[2J")
+
+	assert.Equal(t, "a b c[2J", cell.content)
+	assert.Equal(t, "a b c[2J", NewCellColor("a\nb\tc\x1b[2J", nil).content)
+}

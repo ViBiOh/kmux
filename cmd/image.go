@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ViBiOh/kmux/pkg/client"
+	"github.com/ViBiOh/kmux/pkg/output"
 	"github.com/ViBiOh/kmux/pkg/resource"
 	"github.com/spf13/cobra"
 )
@@ -35,7 +36,7 @@ var imageCmd = &cobra.Command{
 			}
 
 			for _, container := range resource.SelectedContainers(podSpec, containerRegexp) {
-				kube.Std("%s", container.Image)
+				kube.Std("%s", output.Sanitize(container.Image))
 			}
 
 			return nil

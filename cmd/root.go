@@ -52,7 +52,7 @@ var rootCmd = &cobra.Command{
 				return fmt.Errorf("get server version: %w", err)
 			}
 
-			kube.Std("Cluster version: %s\nNamespace: %s", info, kube.Namespace)
+			kube.Std("Cluster version: %s\nNamespace: %s", output.Sanitize(info.String()), output.Sanitize(kube.Namespace))
 
 			return nil
 		})

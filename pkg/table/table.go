@@ -11,6 +11,8 @@ import (
 	"github.com/fatih/color"
 )
 
+var cellReplacer = strings.NewReplacer("\n", " ", "\t", " ")
+
 type Table struct {
 	widths []uint64
 	mutex  sync.Mutex
@@ -66,14 +68,18 @@ type Cell struct {
 
 func NewCell(content string) Cell {
 	return Cell{
-		content: content,
+		content: singleLine(content),
 		printer: fmt.Fprintf,
 	}
 }
 
 func NewCellColor(content string, color *color.Color) Cell {
 	return Cell{
-		content: content,
+		content: singleLine(content),
 		printer: color.Fprintf,
 	}
+}
+
+func singleLine(content string) string {
+	return cellReplacer.Replace(output.Sanitize(content))
 }

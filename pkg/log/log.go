@@ -244,6 +244,8 @@ func (l Logger) outputLog(reader io.Reader, outputter output.Outputter) {
 }
 
 func (l Logger) outputLine(text string, outputter output.Outputter) {
+	text = output.Sanitize(text)
+
 	lineColor := ColorOfJSON(text, l.jsonColorKeys...)
 
 	if colorIsGreater(lineColor, l.colorFilter) {

@@ -3,6 +3,7 @@ package output
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/fatih/color"
 )
@@ -22,22 +23,41 @@ func Std(prefix, format string, args ...any) {
 }
 
 func Warn(prefix, format string, args ...any) {
-	outputContent(false, prefix, Yellow.Sprintf(format, args...))
+	outputContent(false, prefix, Yellow.Sprint(Sanitize(fmt.Sprintf(format, args...))))
 }
 
 func Err(prefix, format string, args ...any) {
-	outputContent(false, prefix, Red.Sprintf(format, args...))
+	outputContent(false, prefix, Red.Sprint(Sanitize(fmt.Sprintf(format, args...))))
 }
 
 func Info(prefix, format string, args ...any) {
 	outputContent(false, prefix, fmt.Sprintf(format, args...))
 }
 
+// Sanitize drops control characters, other than newline and tab, from content
+// coming from the cluster, so it cannot drive the terminal with escape sequences.
+// Line separators and bidirectional overrides are dropped too, they spoof the output.
+func Sanitize(content string) string {
+	return strings.Map(func(char rune) rune {
+		switch {
+		case char == '\n', char == '\t':
+			return char
+		case char < 0x20, char >= 0x7f && char <= 0x9f,
+			char == 0x2028, char == 0x2029,
+			char >= 0x202a && char <= 0x202e,
+			char >= 0x2066 && char <= 0x2069:
+			return -1
+		default:
+			return char
+		}
+	}, content)
+}
+
 func Fatal(format string, args ...any) {
 	Close()
 	<-Done()
 
-	_, _ = fmt.Fprintln(os.Stderr, Red.Sprintf(format, args...))
+	_, _ = fmt.Fprintln(os.Stderr, Red.Sprint(Sanitize(fmt.Sprintf(format, args...))))
 
 	os.Exit(1)
 }
