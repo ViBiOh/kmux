@@ -19,7 +19,10 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
-const maxLineSize = 1024 * 1024
+const (
+	maxLineSize = 1024 * 1024
+	readerSize  = 64 * 1024
+)
 
 type Logger struct {
 	selector        map[string]string
@@ -222,25 +225,71 @@ func (l Logger) outputLog(reader io.Reader, outputter output.Outputter) {
 		defer outputter.Warn("Log ended.")
 	}
 
-	streamScanner := bufio.NewScanner(reader)
-	streamScanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), maxLineSize)
-	streamScanner.Split(bufio.ScanLines)
+	lineReader := bufio.NewReaderSize(reader, readerSize)
 
-	for streamScanner.Scan() {
-		l.outputLine(streamScanner.Text(), outputter)
-	}
-
-	if err := streamScanner.Err(); err != nil {
-		if errors.Is(err, bufio.ErrTooLong) {
-			outputter.Err("log line above %d bytes, output truncated", maxLineSize)
+	for {
+		line, truncated, err := readLine(lineReader, maxLineSize)
+		if err != nil {
+			if !errors.Is(err, io.EOF) && !errors.Is(err, context.Canceled) {
+				outputter.Err("read logs: %s", err)
+			}
 
 			return
 		}
 
-		if !errors.Is(err, context.Canceled) {
-			outputter.Err("read logs: %s", err)
+		l.outputLine(line, outputter)
+
+		if truncated {
+			outputter.Err("log line above %d bytes, output truncated", maxLineSize)
 		}
 	}
+}
+
+// readLine keeps the first limit bytes of a line and discards the rest, so an oversized line does not end the stream.
+func readLine(reader *bufio.Reader, limit int) (string, bool, error) {
+	var line []byte
+
+	var truncated, pendingCR bool
+
+	for {
+		chunk, err := reader.ReadSlice('\n')
+		isLast := err == nil || errors.Is(err, io.EOF)
+
+		if err == nil {
+			chunk = chunk[:len(chunk)-1]
+		}
+
+		// A carriage return ending a chunk is only dropped when it ends the line, the next chunk tells.
+		if pendingCR && len(chunk) > 0 {
+			line, truncated = appendCapped(line, []byte{'\r'}, limit, truncated)
+			pendingCR = false
+		}
+
+		if bytes.HasSuffix(chunk, []byte{'\r'}) {
+			chunk = chunk[:len(chunk)-1]
+			pendingCR = true
+		}
+
+		line, truncated = appendCapped(line, chunk, limit, truncated)
+
+		if errors.Is(err, bufio.ErrBufferFull) {
+			continue
+		}
+
+		if err != nil && (!isLast || len(line) == 0 && !truncated) {
+			return "", false, err
+		}
+
+		return string(line), truncated, nil
+	}
+}
+
+func appendCapped(line, chunk []byte, limit int, truncated bool) ([]byte, bool) {
+	if room := limit - len(line); len(chunk) > room {
+		return append(line, chunk[:room]...), true
+	}
+
+	return append(line, chunk...), truncated
 }
 
 func (l Logger) outputLine(text string, outputter output.Outputter) {

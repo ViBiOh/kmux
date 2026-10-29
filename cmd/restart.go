@@ -122,7 +122,7 @@ func replaceJob(ctx context.Context, kube client.Kube, name string) error {
 }
 
 func waitForJobDeletion(ctx context.Context, kube client.Kube, name string) error {
-	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, time.Minute, true, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, 2*time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
 		if _, err := kube.BatchV1().Jobs(kube.Namespace).Get(ctx, name, v1.GetOptions{}); apierrors.IsNotFound(err) {
 			return true, nil
 		}
