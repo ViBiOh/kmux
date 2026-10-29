@@ -59,7 +59,14 @@ func Fatal(format string, args ...any) {
 
 	_, _ = fmt.Fprintln(os.Stderr, Red.Sprint(Sanitize(fmt.Sprintf(format, args...))))
 
-	os.Exit(1)
+	Exit(1)
+}
+
+func Exit(code int) {
+	Close()
+	<-Done()
+
+	os.Exit(code)
 }
 
 type Outputter struct {

@@ -90,9 +90,7 @@ var logCmd = &cobra.Command{
 			WithJsonColorKeys(jsonColorKeys).
 			WithRawOutput(rawOutput)
 
-		clients.Execute(ctx, logger.Log)
-
-		return nil
+		return clients.Execute(ctx, logger.Log)
 	},
 }
 

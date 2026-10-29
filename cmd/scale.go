@@ -41,7 +41,7 @@ var scaleCmd = &cobra.Command{
 		ctx, cancel := commandContext(cmd)
 		defer cancel()
 
-		clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
+		return clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
 			scale, err := resource.GetScale(ctx, kube, kind, name)
 			if err != nil {
 				return err
@@ -78,8 +78,6 @@ var scaleCmd = &cobra.Command{
 				return fmt.Errorf("unhandled resource type `%s` for scale", kind)
 			}
 		})
-
-		return nil
 	},
 }
 

@@ -28,9 +28,7 @@ var envCmd = &cobra.Command{
 		envGetter := env.NewEnvGetter(kind, name).
 			WithContainerRegexp(containerRegexp)
 
-		clients.Execute(ctx, envGetter.Get)
-
-		return nil
+		return clients.Execute(ctx, envGetter.Get)
 	},
 }
 

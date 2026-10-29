@@ -58,7 +58,7 @@ var restartCmd = &cobra.Command{
 			return fmt.Errorf("marshal patch: %w", err)
 		}
 
-		clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
+		return clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
 			switch kind {
 			case "ds", "daemonset", "daemonsets":
 				_, err := kube.AppsV1().DaemonSets(kube.Namespace).Patch(ctx, name, types.MergePatchType, payload, v1.PatchOptions{})
@@ -82,8 +82,6 @@ var restartCmd = &cobra.Command{
 				return fmt.Errorf("unhandled resource type `%s` for restart", kind)
 			}
 		})
-
-		return nil
 	},
 }
 

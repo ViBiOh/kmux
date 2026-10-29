@@ -28,7 +28,7 @@ func listCommonObjects(ctx context.Context, namespace string, lister resource.Li
 
 	var successCount uint64
 
-	clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
+	_ = clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
 		items, err := lister(ctx, kube, getNamespace(kube, namespace))
 		if err != nil {
 			return err

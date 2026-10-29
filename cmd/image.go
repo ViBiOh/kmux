@@ -29,7 +29,7 @@ var imageCmd = &cobra.Command{
 			return err
 		}
 
-		clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
+		return clients.Execute(ctx, func(ctx context.Context, kube client.Kube) error {
 			podSpec, err := resource.GetPodSpec(ctx, kube, kind, name)
 			if err != nil {
 				return err
@@ -41,8 +41,6 @@ var imageCmd = &cobra.Command{
 
 			return nil
 		})
-
-		return nil
 	},
 }
 

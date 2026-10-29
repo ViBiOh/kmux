@@ -52,7 +52,7 @@ var portForwardCmd = &cobra.Command{
 		forwarder := forward.NewForwarder(kind, name, remotePort, pool, limiter).
 			WithDryRun(dryRun)
 
-		clients.Execute(ctx, forwarder.Forward)
+		err = clients.Execute(ctx, forwarder.Forward)
 
 		cancel()
 
@@ -60,7 +60,7 @@ var portForwardCmd = &cobra.Command{
 			<-pool.Done()
 		}
 
-		return nil
+		return err
 	},
 }
 

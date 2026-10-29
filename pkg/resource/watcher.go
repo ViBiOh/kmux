@@ -105,17 +105,11 @@ func watchPodsDry(ctx context.Context, kube client.Kube, namespace string, optio
 	}
 
 	podsChan := make(chan watch.Event, len(items))
+	defer close(podsChan)
 
-	go func() {
-		defer close(podsChan)
-
-		for _, pod := range items {
-			podsChan <- watch.Event{
-				Type:   watch.Added,
-				Object: &pod,
-			}
-		}
-	}()
+	for _, pod := range items {
+		podsChan <- watch.Event{Type: watch.Added, Object: &pod}
+	}
 
 	return WrappedWatcher{
 		pods: podsChan,

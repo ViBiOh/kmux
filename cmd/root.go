@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -29,7 +30,11 @@ var (
 var rootCmd = &cobra.Command{
 	Use:   "kmux",
 	Short: "Multiplexing kubectl common tasks across clusters",
+
+	SilenceErrors: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
+		cmd.SilenceUsage = true
+
 		if cmd.Name() == "version" {
 			return err
 		}
@@ -45,8 +50,8 @@ var rootCmd = &cobra.Command{
 		output.Close()
 		<-output.Done()
 	},
-	Run: func(cmd *cobra.Command, args []string) {
-		clients.Execute(cmd.Context(), func(ctx context.Context, kube client.Kube) error {
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return clients.Execute(cmd.Context(), func(ctx context.Context, kube client.Kube) error {
 			info, err := kube.Discovery().ServerVersion()
 			if err != nil {
 				return fmt.Errorf("get server version: %w", err)
@@ -234,7 +239,15 @@ func contains(arr []string, value string) bool {
 }
 
 func Execute() {
-	if err := rootCmd.Execute(); err != nil {
+	err := rootCmd.Execute()
+
+	var reported client.ReportedError
+
+	switch {
+	case err == nil:
+	case errors.As(err, &reported):
+		output.Exit(1)
+	default:
 		output.Fatal("%s", err)
 	}
 }
