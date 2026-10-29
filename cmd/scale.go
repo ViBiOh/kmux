@@ -30,8 +30,8 @@ var scaleCmd = &cobra.Command{
 		kind := args[0]
 		name := args[1]
 
-		if scaleFactor < 0 {
-			return fmt.Errorf("scale factor must be positive, got %g", scaleFactor)
+		if math.IsNaN(scaleFactor) || math.IsInf(scaleFactor, 0) || scaleFactor < 0 {
+			return fmt.Errorf("scale factor must be a finite number, zero or more, got %g", scaleFactor)
 		}
 
 		if scaleFactor == 0 && !scaleForce {
@@ -48,7 +48,11 @@ var scaleCmd = &cobra.Command{
 			}
 
 			oldReplicas := scale.Spec.Replicas
-			scale.Spec.Replicas = scaledReplicas(oldReplicas, scaleFactor)
+
+			scale.Spec.Replicas, err = scaledReplicas(oldReplicas, scaleFactor)
+			if err != nil {
+				return err
+			}
 
 			if oldReplicas == scale.Spec.Replicas {
 				kube.Std("No replica change from %d", scale.Spec.Replicas)
@@ -81,12 +85,17 @@ var scaleCmd = &cobra.Command{
 	},
 }
 
-func scaledReplicas(current int32, factor float64) int32 {
+func scaledReplicas(current int32, factor float64) (int32, error) {
 	if factor == 0 {
-		return 0
+		return 0, nil
 	}
 
-	return int32(math.Ceil(float64(max(1, current)) * factor))
+	replicas := math.Ceil(float64(max(1, current)) * factor)
+	if replicas > math.MaxInt32 {
+		return 0, fmt.Errorf("scaling %d by %g overflows the replica count", current, factor)
+	}
+
+	return int32(replicas), nil
 }
 
 func initScale() {

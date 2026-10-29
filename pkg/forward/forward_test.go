@@ -215,15 +215,6 @@ func TestForwardWithoutPool(t *testing.T) {
 	assert.ErrorContains(t, err, "no local pool", "forwarding without a pool must fail instead of panicking")
 }
 
-func TestGetFreePort(t *testing.T) {
-	t.Parallel()
-
-	port, err := GetFreePort()
-
-	require.NoError(t, err)
-	assert.Positive(t, port)
-}
-
 func TestForwardSetAdd(t *testing.T) {
 	t.Parallel()
 

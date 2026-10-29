@@ -195,8 +195,7 @@ func init() {
 }
 
 func completeContext(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
-	configRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: viper.GetString("kubeconfig")}
-	config, err := configRules.Load()
+	config, err := kubeConfigRules().Load()
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveError
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"runtime/debug"
 	"strconv"
@@ -211,30 +210,33 @@ func (f Forwarder) handleForwardPod(kube client.Kube, active *forwardSet, forwar
 			}
 		}
 
-		port, err := GetFreePort()
-		if err != nil {
-			kube.Err("get free port: %s", err)
-			return
-		}
-
-		backend := fmt.Sprintf("127.0.0.1:%d", port)
-
-		kube.Std("Forwarding from %s to %s...", output.Blue.Sprint(backend), output.Green.Sprintf("%s:%d", pod.Name, remotePort))
 		if f.dryRun {
+			kube.Std("Forwarding to %s...", output.Green.Sprintf("%s:%d", pod.Name, remotePort))
+
 			return
 		}
 
 		defer kube.Warn("Forwarding to %s ended.", pod.Name)
 
-		defer f.pool.Remove(backend)
+		var backend string
 
-		if err := listenPortForward(kube, pod, stopChan, port, remotePort, func() { f.pool.Add(backend) }); err != nil {
+		defer func() { f.pool.Remove(backend) }()
+
+		onReady := func(localPort int32) {
+			backend = fmt.Sprintf("127.0.0.1:%d", localPort)
+
+			kube.Std("Forwarding from %s to %s...", output.Blue.Sprint(backend), output.Green.Sprintf("%s:%d", pod.Name, remotePort))
+
+			f.pool.Add(backend)
+		}
+
+		if err := listenPortForward(kube, pod, stopChan, remotePort, onReady); err != nil {
 			kube.Err("Port-forward for %s failed: %s", pod.Name, err)
 		}
 	})
 }
 
-func listenPortForward(kube client.Kube, pod v1.Pod, stopChan chan struct{}, localPort, podPort int32, onReady func()) error {
+func listenPortForward(kube client.Kube, pod v1.Pod, stopChan chan struct{}, podPort int32, onReady func(localPort int32)) error {
 	transport, upgrader, err := spdy.RoundTripperFor(kube.Config)
 	if err != nil {
 		return fmt.Errorf("transport: %w", err)
@@ -249,7 +251,7 @@ func listenPortForward(kube client.Kube, pod v1.Pod, stopChan chan struct{}, loc
 	readyChan := make(chan struct{})
 
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, http.MethodPost, request.URL())
-	forwarder, err := portforward.New(dialer, []string{fmt.Sprintf("%d:%d", localPort, podPort)}, stopChan, readyChan, nil, kube.Outputter)
+	forwarder, err := portforward.NewOnAddresses(dialer, []string{"127.0.0.1"}, []string{fmt.Sprintf("0:%d", podPort)}, stopChan, readyChan, nil, kube.Outputter)
 	if err != nil {
 		return fmt.Errorf("create forwarder: %w", err)
 	}
@@ -268,29 +270,21 @@ func listenPortForward(kube client.Kube, pod v1.Pod, stopChan chan struct{}, loc
 
 	select {
 	case <-readyChan:
-		onReady()
+		ports, portsErr := forwarder.GetPorts()
+		if portsErr == nil && len(ports) == 0 {
+			portsErr = errors.New("no forwarded port")
+		}
+
+		if portsErr != nil {
+			// the caller closes stopChan on return, which ends the forwarding goroutine
+			return fmt.Errorf("get forwarded ports: %w", portsErr)
+		}
+
+		onReady(int32(ports[0].Local))
 
 		return <-errChan
 
 	case forwardErr := <-errChan:
 		return forwardErr
 	}
-}
-
-func GetFreePort() (int32, error) {
-	addr, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
-	if err != nil {
-		return 0, fmt.Errorf("resolve local address: %w", err)
-	}
-
-	listener, err := net.ListenTCP("tcp", addr)
-	if err != nil {
-		return 0, fmt.Errorf("listen tcp: %w", err)
-	}
-
-	if closeErr := listener.Close(); closeErr != nil {
-		return 0, fmt.Errorf("close listener: %w", closeErr)
-	}
-
-	return int32(listener.Addr().(*net.TCPAddr).Port), nil
 }

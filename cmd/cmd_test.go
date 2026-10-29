@@ -2,11 +2,16 @@ package cmd
 
 import (
 	"context"
+	"math"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/ViBiOh/kmux/pkg/client"
 	"github.com/ViBiOh/kmux/pkg/resource"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
@@ -89,30 +94,37 @@ func TestScaledReplicas(t *testing.T) {
 		current int32
 		factor  float64
 		want    int32
+		wantErr bool
 	}{
 		"double": {
-			2, 2, 4,
+			2, 2, 4, false,
 		},
 		"half rounds up": {
-			3, 0.5, 2,
+			3, 0.5, 2, false,
 		},
 		"fifty percent more": {
-			2, 1.5, 3,
+			2, 1.5, 3, false,
 		},
 		"same factor keeps the count": {
-			3, 1, 3,
+			3, 1, 3, false,
 		},
 		"down to zero": {
-			5, 0, 0,
+			5, 0, 0, false,
 		},
 		"from zero starts at one": {
-			0, 1, 1,
+			0, 1, 1, false,
 		},
 		"from zero doubles from one": {
-			0, 2, 2,
+			0, 2, 2, false,
 		},
 		"small factor keeps at least one": {
-			1, 0.1, 1,
+			1, 0.1, 1, false,
+		},
+		"overflow": {
+			math.MaxInt32, 2, 0, true,
+		},
+		"huge factor": {
+			2, 1e300, 0, true,
 		},
 	}
 
@@ -120,7 +132,16 @@ func TestScaledReplicas(t *testing.T) {
 		t.Run(intention, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, testCase.want, scaledReplicas(testCase.current, testCase.factor))
+			got, err := scaledReplicas(testCase.current, testCase.factor)
+
+			if testCase.wantErr {
+				require.Error(t, err)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, testCase.want, got)
 		})
 	}
 }
@@ -279,4 +300,52 @@ func TestListObjectsTimeout(t *testing.T) {
 
 	require.True(t, hasDeadline)
 	assert.WithinDuration(t, time.Now().Add(completionTimeout), deadline, time.Second)
+}
+
+// TestCompleteContext is not parallel, it sets the environment and the shared kubeconfig flag.
+func TestCompleteContext(t *testing.T) {
+	writeConfig := func(name string, contexts ...string) string {
+		content := "apiVersion: v1\nkind: Config\ncontexts:\n"
+		for _, contextName := range contexts {
+			content += "- name: " + contextName + "\n  context:\n    cluster: cluster\n    user: user\n"
+		}
+
+		path := filepath.Join(t.TempDir(), name)
+		require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+
+		return path
+	}
+
+	first := writeConfig("first", "alpha", "beta")
+	second := writeConfig("second", "gamma")
+
+	cases := map[string]struct {
+		envConfig  string
+		flagConfig string
+		want       []string
+	}{
+		"from the environment": {
+			first, "", []string{"alpha", "beta"},
+		},
+		"from the flag": {
+			"", second, []string{"gamma"},
+		},
+		"from several files in the flag": {
+			"", first + string(filepath.ListSeparator) + second, []string{"alpha", "beta", "gamma"},
+		},
+	}
+
+	for intention, testCase := range cases {
+		t.Run(intention, func(t *testing.T) {
+			t.Setenv("KUBECONFIG", testCase.envConfig)
+			viper.Set("kubeconfig", testCase.flagConfig)
+
+			defer viper.Set("kubeconfig", "")
+
+			got, directive := completeContext(nil, nil, "")
+
+			assert.Equal(t, cobra.ShellCompDirectiveNoFileComp, directive)
+			assert.ElementsMatch(t, testCase.want, got)
+		})
+	}
 }
