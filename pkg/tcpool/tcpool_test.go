@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -229,6 +230,137 @@ func TestServe(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("pool did not stop")
 	}
+}
+
+// TestServeHalfClose checks a client that stops sending still gets the answer.
+func TestServeHalfClose(t *testing.T) {
+	t.Parallel()
+
+	backend, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	defer func() {
+		_ = backend.Close()
+	}()
+
+	go func() {
+		conn, acceptErr := backend.Accept()
+		if acceptErr != nil {
+			return
+		}
+
+		defer func() {
+			_ = conn.Close()
+		}()
+
+		request, _ := io.ReadAll(conn)
+		_, _ = conn.Write(append([]byte("got:"), request...))
+	}()
+
+	local, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	localPort := uint64(local.Addr().(*net.TCPAddr).Port)
+	require.NoError(t, local.Close())
+
+	instance := New().Add(backend.Addr().String())
+	require.NoError(t, instance.Listen(localPort))
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go instance.Serve(ctx)
+
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", localPort), time.Second)
+	require.NoError(t, err)
+
+	defer func() {
+		_ = conn.Close()
+	}()
+
+	_, err = conn.Write([]byte("ping"))
+	require.NoError(t, err)
+
+	tcpConn, ok := conn.(*net.TCPConn)
+	require.True(t, ok)
+	require.NoError(t, tcpConn.CloseWrite())
+
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(2*time.Second)))
+
+	answer, err := io.ReadAll(conn)
+	require.NoError(t, err)
+
+	assert.Equal(t, "got:ping", string(answer))
+
+	cancel()
+	<-instance.Done()
+}
+
+// TestServeCancelClosesConnections checks an idle connection does not outlive the pool.
+func TestServeCancelClosesConnections(t *testing.T) {
+	t.Parallel()
+
+	backend, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	defer func() {
+		_ = backend.Close()
+	}()
+
+	release := make(chan struct{})
+
+	defer close(release)
+
+	accepted := make(chan struct{})
+
+	go func() {
+		conn, acceptErr := backend.Accept()
+		if acceptErr != nil {
+			return
+		}
+
+		defer func() {
+			_ = conn.Close()
+		}()
+
+		close(accepted)
+
+		<-release
+	}()
+
+	local, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	localPort := uint64(local.Addr().(*net.TCPAddr).Port)
+	require.NoError(t, local.Close())
+
+	instance := New().Add(backend.Addr().String())
+	require.NoError(t, instance.Listen(localPort))
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go instance.Serve(ctx)
+
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", localPort), time.Second)
+	require.NoError(t, err)
+
+	defer func() {
+		_ = conn.Close()
+	}()
+
+	select {
+	case <-accepted:
+	case <-time.After(2 * time.Second):
+		require.Fail(t, "pool did not reach the backend")
+	}
+
+	cancel()
+
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(2*time.Second)))
+
+	_, err = conn.Read(make([]byte, 1))
+
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, os.ErrDeadlineExceeded, "the pool must close the connection")
 }
 
 func TestServeWithoutBackend(t *testing.T) {

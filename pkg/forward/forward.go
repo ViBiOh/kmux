@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"runtime/debug"
 	"strconv"
 	"sync"
 
@@ -225,16 +226,15 @@ func (f Forwarder) handleForwardPod(kube client.Kube, active *forwardSet, forwar
 
 		defer kube.Warn("Forwarding to %s ended.", pod.Name)
 
-		f.pool.Add(backend)
 		defer f.pool.Remove(backend)
 
-		if err := listenPortForward(kube, pod, stopChan, port, remotePort); err != nil {
+		if err := listenPortForward(kube, pod, stopChan, port, remotePort, func() { f.pool.Add(backend) }); err != nil {
 			kube.Err("Port-forward for %s failed: %s", pod.Name, err)
 		}
 	})
 }
 
-func listenPortForward(kube client.Kube, pod v1.Pod, stopChan chan struct{}, localPort, podPort int32) error {
+func listenPortForward(kube client.Kube, pod v1.Pod, stopChan chan struct{}, localPort, podPort int32, onReady func()) error {
 	transport, upgrader, err := spdy.RoundTripperFor(kube.Config)
 	if err != nil {
 		return fmt.Errorf("transport: %w", err)
@@ -246,13 +246,35 @@ func listenPortForward(kube client.Kube, pod v1.Pod, stopChan chan struct{}, loc
 		Name(pod.Name).
 		SubResource("portforward")
 
+	readyChan := make(chan struct{})
+
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, http.MethodPost, request.URL())
-	forwarder, err := portforward.New(dialer, []string{fmt.Sprintf("%d:%d", localPort, podPort)}, stopChan, nil, nil, kube.Outputter)
+	forwarder, err := portforward.New(dialer, []string{fmt.Sprintf("%d:%d", localPort, podPort)}, stopChan, readyChan, nil, kube.Outputter)
 	if err != nil {
-		return err
+		return fmt.Errorf("create forwarder: %w", err)
 	}
 
-	return forwarder.ForwardPorts()
+	errChan := make(chan error, 1)
+
+	go func() {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				errChan <- fmt.Errorf("recovered panic: %v\n%s", recovered, debug.Stack())
+			}
+		}()
+
+		errChan <- forwarder.ForwardPorts()
+	}()
+
+	select {
+	case <-readyChan:
+		onReady()
+
+		return <-errChan
+
+	case forwardErr := <-errChan:
+		return forwardErr
+	}
 }
 
 func GetFreePort() (int32, error) {

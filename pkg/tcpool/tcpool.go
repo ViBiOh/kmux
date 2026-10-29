@@ -8,9 +8,12 @@ import (
 	"net"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/ViBiOh/kmux/pkg/output"
 )
+
+const dialTimeout = 10 * time.Second
 
 type Pool struct {
 	done     chan struct{}
@@ -71,7 +74,7 @@ func (p *Pool) next() string {
 	return backend
 }
 
-func (p *Pool) handle(upstream net.Conn) {
+func (p *Pool) handle(ctx context.Context, upstream net.Conn) {
 	backend := p.next()
 	if len(backend) == 0 {
 		output.Err("", "no pod available to forward to")
@@ -81,7 +84,7 @@ func (p *Pool) handle(upstream net.Conn) {
 		return
 	}
 
-	downstream, err := net.Dial("tcp", backend)
+	downstream, err := (&net.Dialer{Timeout: dialTimeout}).DialContext(ctx, "tcp", backend)
 	if err != nil {
 		output.Err("", "dial %s: %s", backend, err)
 
@@ -90,8 +93,7 @@ func (p *Pool) handle(upstream net.Conn) {
 		return
 	}
 
-	go stream(downstream, upstream)
-	go stream(upstream, downstream)
+	pipe(ctx, upstream, downstream)
 }
 
 func (p *Pool) Listen(localPort uint64) error {
@@ -114,7 +116,9 @@ func (p *Pool) Serve(ctx context.Context) {
 		return
 	}
 
-	go func() {
+	var serving sync.WaitGroup
+
+	serving.Go(func() {
 		for {
 			conn, err := p.listener.Accept()
 			if err != nil {
@@ -127,21 +131,57 @@ func (p *Pool) Serve(ctx context.Context) {
 				continue
 			}
 
-			go p.handle(conn)
+			serving.Go(func() {
+				p.handle(ctx, conn)
+			})
 		}
-	}()
+	})
 
 	<-ctx.Done()
 
 	closeWithLog(p.listener)
+
+	serving.Wait()
 }
 
-func stream(writer io.WriteCloser, reader io.Reader) {
-	defer closeWithLog(writer)
-
-	if _, err := io.Copy(writer, reader); err != nil && !errors.Is(err, net.ErrClosed) {
-		output.Err("", "pool copy: %s", err)
+func pipe(ctx context.Context, upstream, downstream net.Conn) {
+	closeBoth := func() {
+		closeWithLog(upstream)
+		closeWithLog(downstream)
 	}
+
+	defer closeBoth()
+	defer context.AfterFunc(ctx, closeBoth)()
+
+	var copying sync.WaitGroup
+
+	copying.Go(func() { stream(downstream, upstream, closeBoth) })
+	copying.Go(func() { stream(upstream, downstream, closeBoth) })
+
+	copying.Wait()
+}
+
+// stream ends the writing side only on a clean end of input, so a peer that stops sending still receives the answer.
+func stream(writer net.Conn, reader io.Reader, abort func()) {
+	if _, err := io.Copy(writer, reader); err != nil {
+		if !errors.Is(err, net.ErrClosed) {
+			output.Err("", "pool copy: %s", err)
+		}
+
+		abort()
+
+		return
+	}
+
+	if halfCloser, ok := writer.(interface{ CloseWrite() error }); ok {
+		if err := halfCloser.CloseWrite(); err != nil && !errors.Is(err, net.ErrClosed) {
+			output.Err("", "close write: %s", err)
+		}
+
+		return
+	}
+
+	closeWithLog(writer)
 }
 
 func closeWithLog(closer io.Closer) {
