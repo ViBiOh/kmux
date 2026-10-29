@@ -81,7 +81,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/kms v1.61.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.10.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.38.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.38.5 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.43.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.51.4 // indirect
 	github.com/aws/smithy-go v1.28.6 // indirect
