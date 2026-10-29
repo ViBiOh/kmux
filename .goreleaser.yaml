@@ -53,6 +53,12 @@ signs:
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
 
+release:
+  use_existing_draft: true
+  replace_existing_artifacts: true
+  preflight:
+    fail_on_error: true
+
 changelog:
   sort: asc
   filters:
