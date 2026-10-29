@@ -153,7 +153,7 @@ func (l Logger) handlePod(ctx context.Context, kube client.Kube, streams *stream
 
 		if pod.Status.Phase != v1.PodRunning {
 			streaming.Go(func() {
-				l.logPod(ctx, kube, pod.Namespace, pod.Name, container.Name)
+				l.streamPod(ctx, kube, pod.Namespace, pod.Name, container.Name, false)
 			})
 
 			continue
@@ -167,28 +167,14 @@ func (l Logger) handlePod(ctx context.Context, kube client.Kube, streams *stream
 		streaming.Go(func() {
 			defer streams.remove(pod.UID, container.Name)
 
-			l.streamPod(streamCtx, kube, pod.Namespace, pod.Name, container.Name)
+			l.streamPod(streamCtx, kube, pod.Namespace, pod.Name, container.Name, !l.noFollow)
 		})
 	}
 }
 
-func (l Logger) logPod(ctx context.Context, kube client.Kube, namespace, name, container string) {
-	content, err := kube.CoreV1().Pods(namespace).GetLogs(name, &v1.PodLogOptions{
-		SinceSeconds: l.sinceSeconds(),
-		Container:    container,
-	}).DoRaw(ctx)
-	if err != nil {
-		kube.Err("get logs: %s", err)
-
-		return
-	}
-
-	l.outputLog(bytes.NewReader(content), l.logOutputter(kube, name, container))
-}
-
-func (l Logger) streamPod(ctx context.Context, kube client.Kube, namespace, name, container string) {
+func (l Logger) streamPod(ctx context.Context, kube client.Kube, namespace, name, container string, follow bool) {
 	stream, err := kube.CoreV1().Pods(namespace).GetLogs(name, &v1.PodLogOptions{
-		Follow:       !l.noFollow,
+		Follow:       follow,
 		SinceSeconds: l.sinceSeconds(),
 		Container:    container,
 	}).Stream(ctx)
