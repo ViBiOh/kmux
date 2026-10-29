@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"sync"
 
 	"github.com/ViBiOh/kmux/pkg/client"
 	v1 "k8s.io/api/core/v1"
@@ -69,9 +70,13 @@ func watchPods(ctx context.Context, kube client.Kube, namespace string, options 
 	}
 
 	podsChan := make(chan watch.Event, runtime.NumCPU())
+	done := make(chan struct{})
+
+	var stopOnce sync.Once
 
 	go func() {
 		defer close(podsChan)
+		defer watcher.Stop()
 
 		for event := range watcher.ResultChan() {
 			pod, ok := event.Object.(*v1.Pod)
@@ -79,14 +84,25 @@ func watchPods(ctx context.Context, kube client.Kube, namespace string, options 
 				continue
 			}
 
-			if postListFilter(ctx, kube, *pod) {
-				podsChan <- event
+			if !postListFilter(ctx, kube, *pod) {
+				continue
+			}
+
+			select {
+			case podsChan <- event:
+			case <-done:
+				return
+			case <-ctx.Done():
+				return
 			}
 		}
 	}()
 
 	return WrappedWatcher{
-		stop: watcher.Stop,
+		stop: func() {
+			stopOnce.Do(func() { close(done) })
+			watcher.Stop()
+		},
 		pods: podsChan,
 	}, nil
 }

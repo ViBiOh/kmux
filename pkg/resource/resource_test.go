@@ -3,7 +3,9 @@ package resource
 import (
 	"context"
 	"regexp"
+	goruntime "runtime"
 	"testing"
+	"time"
 
 	"github.com/ViBiOh/kmux/pkg/client"
 	"github.com/stretchr/testify/assert"
@@ -14,7 +16,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/fake"
+	kubetesting "k8s.io/client-go/testing"
 )
 
 const testNamespace = "default"
@@ -425,4 +429,39 @@ func TestListPods(t *testing.T) {
 	}
 
 	assert.ElementsMatch(t, []string{"web-1", "web-2"}, names)
+}
+
+func TestWatchPodsStopUnblocksFilter(t *testing.T) {
+	t.Parallel()
+
+	fakeWatcher := watch.NewFake()
+	clientset := fake.NewClientset()
+	clientset.PrependWatchReactor("pods", kubetesting.DefaultWatchReactor(fakeWatcher, nil))
+
+	kube := client.New("one", testNamespace, nil, clientset)
+	filter := func(context.Context, client.Kube, v1.Pod) bool { return true }
+
+	watcher, err := watchPods(context.Background(), kube, testNamespace, metav1.ListOptions{}, filter)
+	require.NoError(t, err)
+
+	// the buffer fills up and one more event is held by the forwarding goroutine, nobody reads
+	for range goruntime.NumCPU() + 1 {
+		fakeWatcher.Add(&v1.Pod{Name: "web"})
+	}
+
+	watcher.Stop()
+
+	timeout := time.After(5 * time.Second)
+
+	for {
+		select {
+		case _, open := <-watcher.ResultChan():
+			if !open {
+				return
+			}
+
+		case <-timeout:
+			require.Fail(t, "result channel is still open after Stop")
+		}
+	}
 }
