@@ -25,48 +25,48 @@ func newStreamSet() *streamSet {
 	}
 }
 
-func (s *streamSet) add(ctx context.Context, pod types.UID, container string) (context.Context, bool) {
+func (ss *streamSet) add(ctx context.Context, pod types.UID, container string) (context.Context, bool) {
 	key := streamKey{pod: pod, container: container}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	ss.mutex.Lock()
+	defer ss.mutex.Unlock()
 
-	if _, ok := s.streams[key]; ok {
+	if _, ok := ss.streams[key]; ok {
 		return nil, false
 	}
 
 	streamCtx, cancel := context.WithCancel(ctx)
-	s.streams[key] = cancel
+	ss.streams[key] = cancel
 
 	return streamCtx, true
 }
 
-func (s *streamSet) remove(pod types.UID, container string) {
+func (ss *streamSet) remove(pod types.UID, container string) {
 	key := streamKey{pod: pod, container: container}
 
-	s.mutex.Lock()
-	cancel, ok := s.streams[key]
-	delete(s.streams, key)
-	s.mutex.Unlock()
+	ss.mutex.Lock()
+	cancel, ok := ss.streams[key]
+	delete(ss.streams, key)
+	ss.mutex.Unlock()
 
 	if ok {
 		cancel()
 	}
 }
 
-func (s *streamSet) cancelPod(pod types.UID) bool {
-	s.mutex.Lock()
+func (ss *streamSet) cancelPod(pod types.UID) bool {
+	ss.mutex.Lock()
 
 	var cancels []context.CancelFunc
 
-	for key, cancel := range s.streams {
+	for key, cancel := range ss.streams {
 		if key.pod == pod {
 			cancels = append(cancels, cancel)
-			delete(s.streams, key)
+			delete(ss.streams, key)
 		}
 	}
 
-	s.mutex.Unlock()
+	ss.mutex.Unlock()
 
 	for _, cancel := range cancels {
 		cancel()
@@ -75,22 +75,22 @@ func (s *streamSet) cancelPod(pod types.UID) bool {
 	return len(cancels) > 0
 }
 
-func (s *streamSet) markTerminal(pod types.UID) bool {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+func (ss *streamSet) markTerminal(pod types.UID) bool {
+	ss.mutex.Lock()
+	defer ss.mutex.Unlock()
 
-	if s.terminal[pod] {
+	if ss.terminal[pod] {
 		return false
 	}
 
-	s.terminal[pod] = true
+	ss.terminal[pod] = true
 
 	return true
 }
 
-func (s *streamSet) isTerminal(pod types.UID) bool {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+func (ss *streamSet) isTerminal(pod types.UID) bool {
+	ss.mutex.Lock()
+	defer ss.mutex.Unlock()
 
-	return s.terminal[pod]
+	return ss.terminal[pod]
 }

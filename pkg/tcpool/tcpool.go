@@ -26,53 +26,53 @@ func New() *Pool {
 	}
 }
 
-func (bp *Pool) Done() <-chan struct{} {
-	return bp.done
+func (p *Pool) Done() <-chan struct{} {
+	return p.done
 }
 
-func (bp *Pool) Add(backend string) *Pool {
-	bp.mutex.Lock()
-	defer bp.mutex.Unlock()
+func (p *Pool) Add(backend string) *Pool {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 
-	bp.backends = append(bp.backends, backend)
+	p.backends = append(p.backends, backend)
 
-	return bp
+	return p
 }
 
-func (bp *Pool) Remove(toRemove string) *Pool {
-	bp.mutex.Lock()
-	defer bp.mutex.Unlock()
+func (p *Pool) Remove(toRemove string) *Pool {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 
-	index := slices.Index(bp.backends, toRemove)
+	index := slices.Index(p.backends, toRemove)
 	if index < 0 {
-		return bp
+		return p
 	}
 
-	bp.backends = slices.Delete(bp.backends, index, index+1)
+	p.backends = slices.Delete(p.backends, index, index+1)
 
-	if uint64(index) < bp.current {
-		bp.current--
+	if uint64(index) < p.current {
+		p.current--
 	}
 
-	return bp
+	return p
 }
 
-func (bp *Pool) next() string {
-	bp.mutex.Lock()
-	defer bp.mutex.Unlock()
+func (p *Pool) next() string {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 
-	if len(bp.backends) == 0 {
+	if len(p.backends) == 0 {
 		return ""
 	}
 
-	backend := bp.backends[bp.current%uint64(len(bp.backends))]
-	bp.current = (bp.current + 1) % uint64(len(bp.backends))
+	backend := p.backends[p.current%uint64(len(p.backends))]
+	p.current = (p.current + 1) % uint64(len(p.backends))
 
 	return backend
 }
 
-func (bp *Pool) handle(upstream net.Conn) {
-	backend := bp.next()
+func (p *Pool) handle(upstream net.Conn) {
+	backend := p.next()
 	if len(backend) == 0 {
 		output.Err("", "no pod available to forward to")
 
@@ -94,21 +94,21 @@ func (bp *Pool) handle(upstream net.Conn) {
 	go stream(upstream, downstream)
 }
 
-func (bp *Pool) Listen(localPort uint64) error {
+func (p *Pool) Listen(localPort uint64) error {
 	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", localPort))
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)
 	}
 
-	bp.listener = listener
+	p.listener = listener
 
 	return nil
 }
 
-func (bp *Pool) Serve(ctx context.Context) {
-	defer close(bp.done)
+func (p *Pool) Serve(ctx context.Context) {
+	defer close(p.done)
 
-	if bp.listener == nil {
+	if p.listener == nil {
 		output.Err("", "serve without a listener")
 
 		return
@@ -116,7 +116,7 @@ func (bp *Pool) Serve(ctx context.Context) {
 
 	go func() {
 		for {
-			conn, err := bp.listener.Accept()
+			conn, err := p.listener.Accept()
 			if err != nil {
 				if errors.Is(err, net.ErrClosed) {
 					return
@@ -127,13 +127,13 @@ func (bp *Pool) Serve(ctx context.Context) {
 				continue
 			}
 
-			go bp.handle(conn)
+			go p.handle(conn)
 		}
 	}()
 
 	<-ctx.Done()
 
-	closeWithLog(bp.listener)
+	closeWithLog(p.listener)
 }
 
 func stream(writer io.WriteCloser, reader io.Reader) {

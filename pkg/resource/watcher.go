@@ -16,14 +16,14 @@ type WrappedWatcher struct {
 	pods chan watch.Event
 }
 
-func (dw WrappedWatcher) Stop() {
-	if dw.stop != nil {
-		dw.stop()
+func (ww WrappedWatcher) Stop() {
+	if ww.stop != nil {
+		ww.stop()
 	}
 }
 
-func (dw WrappedWatcher) ResultChan() <-chan watch.Event {
-	return dw.pods
+func (ww WrappedWatcher) ResultChan() <-chan watch.Event {
+	return ww.pods
 }
 
 func WatchPods(ctx context.Context, kube client.Kube, kind, name string, labelSelector map[string]string, dryRun bool) (watch.Interface, error) {

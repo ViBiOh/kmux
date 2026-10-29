@@ -17,36 +17,36 @@ func newForwardSet() *forwardSet {
 	}
 }
 
-func (f *forwardSet) add(pod types.UID) (chan struct{}, bool) {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
+func (fs *forwardSet) add(pod types.UID) (chan struct{}, bool) {
+	fs.mutex.Lock()
+	defer fs.mutex.Unlock()
 
-	if _, ok := f.forwards[pod]; ok {
+	if _, ok := fs.forwards[pod]; ok {
 		return nil, false
 	}
 
 	stopChan := make(chan struct{})
-	f.forwards[pod] = stopChan
+	fs.forwards[pod] = stopChan
 
 	return stopChan, true
 }
 
-func (f *forwardSet) stop(pod types.UID) {
-	f.mutex.Lock()
-	stopChan, ok := f.forwards[pod]
-	delete(f.forwards, pod)
-	f.mutex.Unlock()
+func (fs *forwardSet) stop(pod types.UID) {
+	fs.mutex.Lock()
+	stopChan, ok := fs.forwards[pod]
+	delete(fs.forwards, pod)
+	fs.mutex.Unlock()
 
 	if ok {
 		close(stopChan)
 	}
 }
 
-func (f *forwardSet) stopAll() {
-	f.mutex.Lock()
-	forwards := f.forwards
-	f.forwards = make(map[types.UID]chan struct{})
-	f.mutex.Unlock()
+func (fs *forwardSet) stopAll() {
+	fs.mutex.Lock()
+	forwards := fs.forwards
+	fs.forwards = make(map[types.UID]chan struct{})
+	fs.mutex.Unlock()
 
 	for _, stopChan := range forwards {
 		close(stopChan)
