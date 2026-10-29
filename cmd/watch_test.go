@@ -220,8 +220,8 @@ func TestGetPodStatus(t *testing.T) {
 		},
 		"terminating pod": {
 			v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: new(metav1.Now())},
-				Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "app"}}},
+				DeletionTimestamp: new(metav1.Now()),
+				Spec:              v1.PodSpec{Containers: []v1.Container{{Name: "app"}}},
 				Status: v1.PodStatus{
 					Phase: v1.PodRunning,
 					ContainerStatuses: []v1.ContainerStatus{{
@@ -236,9 +236,9 @@ func TestGetPodStatus(t *testing.T) {
 		},
 		"pod of a lost node": {
 			v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: new(metav1.Now())},
-				Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "app"}}},
-				Status:     v1.PodStatus{Phase: v1.PodRunning, Reason: "NodeLost"},
+				DeletionTimestamp: new(metav1.Now()),
+				Spec:              v1.PodSpec{Containers: []v1.Container{{Name: "app"}}},
+				Status:            v1.PodStatus{Phase: v1.PodRunning, Reason: "NodeLost"},
 			},
 			"Unknown", 0, 1, 0,
 			time.Time{},
@@ -372,9 +372,9 @@ func TestComparePodsByAge(t *testing.T) {
 	newer := metav1.NewTime(time.Date(2024, time.March, 2, 10, 0, 0, 0, time.UTC))
 
 	pods := []watchPod{
-		{Pod: v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "newer"}, Status: v1.PodStatus{StartTime: &newer}}},
-		{Pod: v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "without start time"}}},
-		{Pod: v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "older"}, Status: v1.PodStatus{StartTime: &older}}},
+		{Name: "newer", Status: v1.PodStatus{StartTime: &newer}},
+		{Name: "without start time"},
+		{Name: "older", Status: v1.PodStatus{StartTime: &older}},
 	}
 
 	assert.Negative(t, comparePodsByAge(pods[2], pods[0]), "older is before newer")
@@ -388,9 +388,9 @@ func TestOutputWatchDoesNotPanic(t *testing.T) {
 
 	assert.NotPanics(t, func() {
 		outputWatch(watchTable, "ctx", v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{Name: "web-1", Namespace: "default"},
-			Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "app"}}},
-			Status:     v1.PodStatus{Phase: v1.PodRunning},
+			Name: "web-1", Namespace: "default",
+			Spec:   v1.PodSpec{Containers: []v1.Container{{Name: "app"}}},
+			Status: v1.PodStatus{Phase: v1.PodRunning},
 		})
 	})
 }

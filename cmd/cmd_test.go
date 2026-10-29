@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -18,7 +17,7 @@ import (
 const testNamespace = "default"
 
 func deployment(name, namespace string) runtime.Object {
-	return &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace}}
+	return &appsv1.Deployment{Name: name, Namespace: namespace}
 }
 
 func TestParsePorts(t *testing.T) {

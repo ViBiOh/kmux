@@ -11,6 +11,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -253,10 +254,10 @@ func podLabelSelectorGetter(ctx context.Context, kube client.Kube, kind, name st
 func podFieldSelectorGetter(kind, name string) (string, error) {
 	switch kind {
 	case "po", "pod", "pods":
-		return fmt.Sprintf("metadata.name=%s", name), nil
+		return fields.OneTermEqualSelector("metadata.name", name).String(), nil
 
 	case "no", "node", "nodes":
-		return fmt.Sprintf("spec.nodeName=%s", name), nil
+		return fields.OneTermEqualSelector("spec.nodeName", name).String(), nil
 
 	default:
 		return "", unhandledError(kind)

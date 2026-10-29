@@ -99,18 +99,18 @@ func TestListerFor(t *testing.T) {
 	t.Parallel()
 
 	objects := []runtime.Object{
-		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "web", Namespace: testNamespace}},
-		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "api", Namespace: testNamespace}},
-		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "other", Namespace: "kube-system"}},
-		&appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: "db", Namespace: testNamespace}},
-		&appsv1.ReplicaSet{ObjectMeta: metav1.ObjectMeta{Name: "web-123", Namespace: testNamespace}},
-		&appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: testNamespace}},
-		&batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: "cleaner", Namespace: testNamespace}},
-		&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "migration", Namespace: testNamespace}},
-		&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "web-123-abc", Namespace: testNamespace}},
-		&v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "web-svc", Namespace: testNamespace}},
-		&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}},
-		&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}},
+		&appsv1.Deployment{Name: "web", Namespace: testNamespace},
+		&appsv1.Deployment{Name: "api", Namespace: testNamespace},
+		&appsv1.Deployment{Name: "other", Namespace: "kube-system"},
+		&appsv1.StatefulSet{Name: "db", Namespace: testNamespace},
+		&appsv1.ReplicaSet{Name: "web-123", Namespace: testNamespace},
+		&appsv1.DaemonSet{Name: "agent", Namespace: testNamespace},
+		&batchv1.CronJob{Name: "cleaner", Namespace: testNamespace},
+		&batchv1.Job{Name: "migration", Namespace: testNamespace},
+		&v1.Pod{Name: "web-123-abc", Namespace: testNamespace},
+		&v1.Service{Name: "web-svc", Namespace: testNamespace},
+		&v1.Namespace{Name: testNamespace},
+		&v1.Node{Name: "node-1"},
 	}
 
 	cases := map[string]struct {
@@ -209,17 +209,17 @@ func TestGetPodsSelector(t *testing.T) {
 
 	objects := []runtime.Object{
 		&appsv1.Deployment{
-			ObjectMeta: metav1.ObjectMeta{Name: "web", Namespace: testNamespace},
+			Name: "web", Namespace: testNamespace,
 			Spec: appsv1.DeploymentSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "web"}},
 			},
 		},
 		&appsv1.Deployment{
-			ObjectMeta: metav1.ObjectMeta{Name: "no-selector", Namespace: testNamespace},
+			Name: "no-selector", Namespace: testNamespace,
 		},
 		&v1.Service{
-			ObjectMeta: metav1.ObjectMeta{Name: "web-svc", Namespace: testNamespace},
-			Spec:       v1.ServiceSpec{Selector: map[string]string{"app": "web"}},
+			Name: "web-svc", Namespace: testNamespace,
+			Spec: v1.ServiceSpec{Selector: map[string]string{"app": "web"}},
 		},
 	}
 
@@ -255,6 +255,10 @@ func TestGetPodsSelector(t *testing.T) {
 		"pod": {
 			"pod", "web-123",
 			testNamespace, "", "metadata.name=web-123", false, "",
+		},
+		"pod name is escaped": {
+			"pod", "web,spec.nodeName=node-1",
+			testNamespace, "", `metadata.name=web\,spec.nodeName\=node-1`, false, "",
 		},
 		"node": {
 			"node", "node-1",
@@ -299,32 +303,26 @@ func TestCronJobPodFilter(t *testing.T) {
 	t.Parallel()
 
 	cronjob := &batchv1.CronJob{
-		ObjectMeta: metav1.ObjectMeta{Name: "cleaner", Namespace: testNamespace, UID: types.UID("cronjob-uid")},
+		Name: "cleaner", Namespace: testNamespace, UID: types.UID("cronjob-uid"),
 	}
 
 	owned := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            "cleaner-1",
-			Namespace:       testNamespace,
-			OwnerReferences: []metav1.OwnerReference{{Kind: "CronJob", Name: "cleaner", UID: types.UID("cronjob-uid")}},
-		},
+		Name:            "cleaner-1",
+		Namespace:       testNamespace,
+		OwnerReferences: []metav1.OwnerReference{{Kind: "CronJob", Name: "cleaner", UID: types.UID("cronjob-uid")}},
 	}
 
 	foreign := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            "other-1",
-			Namespace:       testNamespace,
-			OwnerReferences: []metav1.OwnerReference{{Kind: "CronJob", Name: "other", UID: types.UID("other-uid")}},
-		},
+		Name:            "other-1",
+		Namespace:       testNamespace,
+		OwnerReferences: []metav1.OwnerReference{{Kind: "CronJob", Name: "other", UID: types.UID("other-uid")}},
 	}
 
 	podOf := func(jobName string) v1.Pod {
 		return v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:            jobName + "-abc",
-				Namespace:       testNamespace,
-				OwnerReferences: []metav1.OwnerReference{{Kind: "Job", Name: jobName}},
-			},
+			Name:            jobName + "-abc",
+			Namespace:       testNamespace,
+			OwnerReferences: []metav1.OwnerReference{{Kind: "Job", Name: jobName}},
 		}
 	}
 
@@ -345,7 +343,7 @@ func TestCronJobPodFilter(t *testing.T) {
 			false,
 		},
 		"pod without owner": {
-			v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "standalone", Namespace: testNamespace}},
+			v1.Pod{Name: "standalone", Namespace: testNamespace},
 			false,
 		},
 	}
@@ -368,15 +366,13 @@ func TestCronJobPodFilterCaches(t *testing.T) {
 	t.Parallel()
 
 	cronjob := &batchv1.CronJob{
-		ObjectMeta: metav1.ObjectMeta{Name: "cleaner", Namespace: testNamespace, UID: types.UID("cronjob-uid")},
+		Name: "cleaner", Namespace: testNamespace, UID: types.UID("cronjob-uid"),
 	}
 
 	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            "cleaner-1",
-			Namespace:       testNamespace,
-			OwnerReferences: []metav1.OwnerReference{{Kind: "CronJob", Name: "cleaner", UID: types.UID("cronjob-uid")}},
-		},
+		Name:            "cleaner-1",
+		Namespace:       testNamespace,
+		OwnerReferences: []metav1.OwnerReference{{Kind: "CronJob", Name: "cleaner", UID: types.UID("cronjob-uid")}},
 	}
 
 	clientset := fake.NewClientset(cronjob, job)
@@ -385,11 +381,9 @@ func TestCronJobPodFilterCaches(t *testing.T) {
 	filter := cronJobPodFilter(cronjob)
 
 	pod := v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            "cleaner-1-abc",
-			Namespace:       testNamespace,
-			OwnerReferences: []metav1.OwnerReference{{Kind: "Job", Name: "cleaner-1"}},
-		},
+		Name:            "cleaner-1-abc",
+		Namespace:       testNamespace,
+		OwnerReferences: []metav1.OwnerReference{{Kind: "Job", Name: "cleaner-1"}},
 	}
 
 	for range 5 {
@@ -412,14 +406,14 @@ func TestListPods(t *testing.T) {
 
 	objects := []runtime.Object{
 		&appsv1.Deployment{
-			ObjectMeta: metav1.ObjectMeta{Name: "web", Namespace: testNamespace},
+			Name: "web", Namespace: testNamespace,
 			Spec: appsv1.DeploymentSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "web"}},
 			},
 		},
-		&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "web-1", Namespace: testNamespace, Labels: map[string]string{"app": "web"}}},
-		&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "web-2", Namespace: testNamespace, Labels: map[string]string{"app": "web"}}},
-		&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "api-1", Namespace: testNamespace, Labels: map[string]string{"app": "api"}}},
+		&v1.Pod{Name: "web-1", Namespace: testNamespace, Labels: map[string]string{"app": "web"}},
+		&v1.Pod{Name: "web-2", Namespace: testNamespace, Labels: map[string]string{"app": "web"}},
+		&v1.Pod{Name: "api-1", Namespace: testNamespace, Labels: map[string]string{"app": "api"}},
 	}
 
 	pods, err := ListPods(context.Background(), newKube(objects...), "deployment", "web")

@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -24,7 +23,7 @@ func newKube(objects ...runtime.Object) client.Kube {
 
 func podWithPorts(ports ...v1.ContainerPort) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "web-1", Namespace: testNamespace},
+		Name: "web-1", Namespace: testNamespace,
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{{Name: "app", Ports: ports}},
 		},
@@ -74,7 +73,7 @@ func TestIsForwardPodReady(t *testing.T) {
 	t.Parallel()
 
 	withReadiness := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "web-1", Namespace: testNamespace},
+		Name: "web-1", Namespace: testNamespace,
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{{
 				Name:           "app",
@@ -139,7 +138,7 @@ func TestGetSelectorAndTargetPort(t *testing.T) {
 
 	objects := []runtime.Object{
 		&v1.Service{
-			ObjectMeta: metav1.ObjectMeta{Name: "web", Namespace: testNamespace},
+			Name: "web", Namespace: testNamespace,
 			Spec: v1.ServiceSpec{
 				Selector: map[string]string{"app": "web"},
 				Ports: []v1.ServicePort{
@@ -149,7 +148,7 @@ func TestGetSelectorAndTargetPort(t *testing.T) {
 			},
 		},
 		&v1.Service{
-			ObjectMeta: metav1.ObjectMeta{Name: "headless", Namespace: testNamespace},
+			Name: "headless", Namespace: testNamespace,
 			Spec: v1.ServiceSpec{
 				Ports: []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt32(8080)}},
 			},

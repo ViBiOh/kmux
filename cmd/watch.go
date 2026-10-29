@@ -382,8 +382,7 @@ func getPodStatus(pod v1.Pod) (string, uint, int, uint, time.Time) {
 		hasRunning := false
 		var exitCode int32
 
-		for i := len(pod.Status.ContainerStatuses) - 1; i >= 0; i-- {
-			container := pod.Status.ContainerStatuses[i]
+		for _, container := range slices.Backward(pod.Status.ContainerStatuses) {
 
 			restart += uint(container.RestartCount)
 

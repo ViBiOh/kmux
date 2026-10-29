@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	kubeResource "k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -25,8 +24,8 @@ func TestGetMostLivePod(t *testing.T) {
 
 	podIn := func(name string, phase v1.PodPhase) v1.Pod {
 		return v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{Name: name},
-			Status:     v1.PodStatus{Phase: phase},
+			Name:   name,
+			Status: v1.PodStatus{Phase: phase},
 		}
 	}
 
@@ -79,13 +78,13 @@ func TestGatherEnvDependencies(t *testing.T) {
 	container := v1.Container{
 		Env: []v1.EnvVar{
 			{Name: "PLAIN", Value: "value"},
-			{Name: "FROM_CM", ValueFrom: &v1.EnvVarSource{ConfigMapKeyRef: &v1.ConfigMapKeySelector{LocalObjectReference: v1.LocalObjectReference{Name: "config"}, Key: "key"}}},
-			{Name: "FROM_CM_AGAIN", ValueFrom: &v1.EnvVarSource{ConfigMapKeyRef: &v1.ConfigMapKeySelector{LocalObjectReference: v1.LocalObjectReference{Name: "config"}, Key: "other"}}},
-			{Name: "FROM_SECRET", ValueFrom: &v1.EnvVarSource{SecretKeyRef: &v1.SecretKeySelector{LocalObjectReference: v1.LocalObjectReference{Name: "secret"}, Key: "key"}}},
+			{Name: "FROM_CM", ValueFrom: &v1.EnvVarSource{ConfigMapKeyRef: &v1.ConfigMapKeySelector{Name: "config", Key: "key"}}},
+			{Name: "FROM_CM_AGAIN", ValueFrom: &v1.EnvVarSource{ConfigMapKeyRef: &v1.ConfigMapKeySelector{Name: "config", Key: "other"}}},
+			{Name: "FROM_SECRET", ValueFrom: &v1.EnvVarSource{SecretKeyRef: &v1.SecretKeySelector{Name: "secret", Key: "key"}}},
 		},
 		EnvFrom: []v1.EnvFromSource{
-			{ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "bulk-config"}}},
-			{SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "secret"}}},
+			{ConfigMapRef: &v1.ConfigMapEnvSource{Name: "bulk-config"}},
+			{SecretRef: &v1.SecretEnvSource{Name: "secret"}},
 		},
 	}
 
@@ -100,20 +99,20 @@ func TestGetEnvDependencies(t *testing.T) {
 
 	objects := []runtime.Object{
 		&v1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{Name: "config", Namespace: testNamespace},
-			Data:       map[string]string{"key": "value"},
+			Name: "config", Namespace: testNamespace,
+			Data: map[string]string{"key": "value"},
 		},
 		&v1.Secret{
-			ObjectMeta: metav1.ObjectMeta{Name: "secret", Namespace: testNamespace},
-			Data:       map[string][]byte{"password": []byte("s3cret")},
+			Name: "secret", Namespace: testNamespace,
+			Data: map[string][]byte{"password": []byte("s3cret")},
 		},
 	}
 
 	container := v1.Container{
 		EnvFrom: []v1.EnvFromSource{
-			{ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "config"}}},
-			{ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "missing"}}},
-			{SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "secret"}}},
+			{ConfigMapRef: &v1.ConfigMapEnvSource{Name: "config"}},
+			{ConfigMapRef: &v1.ConfigMapEnvSource{Name: "missing"}},
+			{SecretRef: &v1.SecretEnvSource{Name: "secret"}},
 		},
 	}
 
@@ -220,12 +219,10 @@ func TestGetEnvFieldRef(t *testing.T) {
 	t.Parallel()
 
 	pod := v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        "web-1",
-			Namespace:   testNamespace,
-			Labels:      map[string]string{"app": "web"},
-			Annotations: map[string]string{"owner": "team"},
-		},
+		Name:        "web-1",
+		Namespace:   testNamespace,
+		Labels:      map[string]string{"app": "web"},
+		Annotations: map[string]string{"owner": "team"},
 		Spec: v1.PodSpec{
 			NodeName:           "node-1",
 			ServiceAccountName: "web-sa",
@@ -385,7 +382,7 @@ func TestGet(t *testing.T) {
 
 	objects := []runtime.Object{
 		&v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{Name: "standalone", Namespace: testNamespace},
+			Name: "standalone", Namespace: testNamespace,
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{{
 					Name: "app",
@@ -398,7 +395,7 @@ func TestGet(t *testing.T) {
 			},
 			Status: v1.PodStatus{Phase: v1.PodRunning},
 		},
-		&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}},
+		&v1.Node{Name: "node-1"},
 	}
 
 	err := NewEnvGetter("pod", "standalone").Get(context.Background(), newKube(objects...))
