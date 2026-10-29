@@ -86,7 +86,8 @@ func NewOutputter(name string) Outputter {
 }
 
 func (o Outputter) Write(payload []byte) (int, error) {
-	Std(o.prefix, "%s", payload)
+	Std(o.prefix, "%s", Sanitize(string(payload)))
+
 	return len(payload), nil
 }
 

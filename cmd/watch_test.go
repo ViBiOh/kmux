@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -379,7 +380,15 @@ func TestComparePodsByAge(t *testing.T) {
 
 	assert.Negative(t, comparePodsByAge(pods[2], pods[0]), "older is before newer")
 	assert.Positive(t, comparePodsByAge(pods[0], pods[2]))
-	assert.Zero(t, comparePodsByAge(pods[1], pods[0]), "a pod without start time is never before")
+	assert.Positive(t, comparePodsByAge(pods[1], pods[0]), "a pod without start time is after the others")
+	assert.Negative(t, comparePodsByAge(pods[0], pods[1]))
+	assert.Zero(t, comparePodsByAge(pods[1], pods[1]), "two pods without start time are equal")
+	assert.Zero(t, comparePodsByAge(pods[0], pods[0]))
+
+	sorted := slices.Clone(pods)
+	slices.SortStableFunc(sorted, comparePodsByAge)
+
+	assert.Equal(t, []string{"older", "newer", "without start time"}, []string{sorted[0].Name, sorted[1].Name, sorted[2].Name})
 }
 
 // TestOutputWatchDoesNotPanic is not parallel, it reads the shared output flags.

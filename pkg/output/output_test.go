@@ -1,9 +1,11 @@
 package output
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSanitize(t *testing.T) {
@@ -34,4 +36,26 @@ func TestSanitize(t *testing.T) {
 			assert.Equal(t, testCase.want, Sanitize(testCase.input))
 		})
 	}
+}
+
+func TestOutputterWriteSanitizes(t *testing.T) {
+	original := defaultPrinter
+
+	t.Cleanup(func() { defaultPrinter = original })
+
+	var stdout, stderr bytes.Buffer
+
+	defaultPrinter = newPrinter(&stdout, &stderr)
+
+	go defaultPrinter.start()
+
+	written, err := NewOutputter("").Write([]byte("hello \x1b]0;pwned\x07world\n"))
+
+	Close()
+	<-Done()
+
+	require.NoError(t, err)
+	assert.Equal(t, len("hello \x1b]0;pwned\x07world\n"), written)
+	assert.Equal(t, "hello ]0;pwnedworld\n", stdout.String())
+	assert.Empty(t, stderr.String())
 }

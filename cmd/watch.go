@@ -192,13 +192,17 @@ func displayInitialPods(ctx context.Context, watchTable *table.Table) map[string
 }
 
 func comparePodsByAge(a, b watchPod) int {
+	aStart, bStart := a.Status.StartTime, b.Status.StartTime
+
 	switch {
-	case a.Status.StartTime.Before(b.Status.StartTime):
-		return -1
-	case b.Status.StartTime.Before(a.Status.StartTime):
-		return 1
-	default:
+	case aStart == nil && bStart == nil:
 		return 0
+	case aStart == nil:
+		return 1
+	case bStart == nil:
+		return -1
+	default:
+		return aStart.Compare(bStart.Time)
 	}
 }
 
