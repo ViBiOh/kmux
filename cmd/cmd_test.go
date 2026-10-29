@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/ViBiOh/kmux/pkg/client"
 	"github.com/ViBiOh/kmux/pkg/resource"
@@ -257,4 +258,26 @@ func TestListObjects(t *testing.T) {
 			assert.Equal(t, testCase.want, listCommonObjects(context.Background(), testNamespace, lister))
 		})
 	}
+}
+
+// TestListObjectsTimeout is not parallel, it replaces the shared clients.
+func TestListObjectsTimeout(t *testing.T) {
+	previousClients := clients
+
+	defer func() { clients = previousClients }()
+
+	clients = client.Array{client.New("one", testNamespace, nil, fake.NewClientset())}
+
+	var deadline time.Time
+
+	var hasDeadline bool
+
+	listCommonObjects(context.Background(), testNamespace, func(ctx context.Context, _ client.Kube, _ string) ([]string, error) {
+		deadline, hasDeadline = ctx.Deadline()
+
+		return nil, nil
+	})
+
+	require.True(t, hasDeadline)
+	assert.WithinDuration(t, time.Now().Add(completionTimeout), deadline, time.Second)
 }

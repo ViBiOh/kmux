@@ -4,10 +4,13 @@ import (
 	"context"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/ViBiOh/kmux/pkg/client"
 	"github.com/ViBiOh/kmux/pkg/resource"
 )
+
+const completionTimeout = 5 * time.Second
 
 func getNamespace(kube client.Kube, namespace string) string {
 	if len(namespace) != 0 {
@@ -22,6 +25,9 @@ func getNamespace(kube client.Kube, namespace string) string {
 }
 
 func listCommonObjects(ctx context.Context, namespace string, lister resource.Lister) []string {
+	ctx, cancel := context.WithTimeout(ctx, completionTimeout)
+	defer cancel()
+
 	var mutex sync.Mutex
 
 	counts := make(map[string]uint64)
