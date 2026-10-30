@@ -21,8 +21,6 @@ updates:
       include: scope
     assignees:
       - ViBiOh
-    allow:
-      - dependency-type: all
     groups:
       kubernetes:
         patterns:
